@@ -1,0 +1,22 @@
+/* Tailwind CSS v4 is configured in CSS, not in a JS config file.
+   There is no tailwind.config.js and no PostCSS step: the @tailwindcss/vite
+   plugin in vite.config.ts does everything. */
+@import 'tailwindcss';
+@plugin 'daisyui';
+
+/* One place for the six verdict colours, so the palette stays consistent
+   across the badge, the report panel and the attack lab. */
+@theme {
+  --color-verdict-authentic: oklch(0.72 0.19 149);
+  --color-verdict-tampered: oklch(0.64 0.21 25);
+  --color-verdict-invalid: oklch(0.65 0.2 15);
+  --color-verdict-missing: oklch(0.7 0.16 70);
+  --color-verdict-location: oklch(0.75 0.15 85);
+  --color-verdict-unknown: oklch(0.6 0.02 260);
+}
+
+/* Zoomed image comparison should show hard pixel edges, not a blur — that is
+   how you actually see an LSB difference. */
+.pixelated {
+  image-rendering: pixelated;
+}

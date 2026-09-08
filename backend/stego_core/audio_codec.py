@@ -1,0 +1,71 @@
+"""WAV/PCM cover objects: file bytes <-> flat numpy array (spec FR2, FR6).
+
+Scope (from TECH_STACK.md): 8-bit unsigned and 16-bit signed little-endian PCM,
+mono or stereo. Anything else (24-bit, 32-bit float, compressed, some
+WAVE_FORMAT_EXTENSIBLE files) -> UnsupportedCoverError, which the API turns into
+the verdict `Cannot Verify`. Convert demo clips with:
+
+    ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 samples/audio/original/clip.wav
+
+>>> THE SIGN TRAP: 16-bit samples are int16. Bit operations on int16 corrupt the
+>>> high bits. Return a uint16 VIEW (arr.view(np.uint16)) and convert back with
+>>> another view before writing. 8-bit WAV is already unsigned uint8.
+
+>>> DO NOT touch the WAV header. Read the params with `wave`, embed only in the
+>>> sample frames, and write the output with the SAME params.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from .errors import UnsupportedCoverError  # noqa: F401  (used once implemented)
+
+
+@dataclass
+class AudioCover:
+    """A decoded audio cover, ready for `lsb.embed_bits`."""
+
+    elements: np.ndarray  # flat uint8 (8-bit) or uint16 view (16-bit), length = frames * channels
+    sample_rate: int
+    channels: int
+    sample_width: int  # bytes per sample: 1 or 2
+    frames: int
+
+
+def load_wav(data: bytes) -> AudioCover:
+    """Decode WAV bytes into a flat unsigned array of samples.
+
+    TODO(team): implement.
+
+    Sketch:
+      with wave.open(io.BytesIO(data), "rb") as w:
+          nchannels, sampwidth, framerate, nframes = w.getparams()[:4]
+          raw = w.readframes(nframes)
+      if sampwidth not in (1, 2): raise UnsupportedCoverError(...)
+      dtype = np.uint8 if sampwidth == 1 else np.int16
+      arr = np.frombuffer(raw, dtype=dtype)
+      elements = arr if sampwidth == 1 else arr.view(np.uint16)   # <- the view
+      return AudioCover(elements.copy(), framerate, nchannels, sampwidth, nframes)
+
+    `wave` raises wave.Error for compressed/exotic files — catch it and re-raise
+    as UnsupportedCoverError with a message the GUI can show.
+    """
+    raise NotImplementedError("TODO(team): load_wav — see docstring")
+
+
+def save_wav(cover: AudioCover, elements: np.ndarray) -> bytes:
+    """Rebuild WAV bytes from (possibly modified) samples, preserving all params.
+
+    TODO(team): implement.
+
+    Sketch:
+      raw = elements.astype(np.uint8).tobytes() if sample_width == 1
+            else elements.view(np.int16).tobytes()
+      with wave.open(buf, "wb") as w:
+          w.setnchannels(cover.channels); w.setsampwidth(cover.sample_width)
+          w.setframerate(cover.sample_rate); w.writeframes(raw)
+    """
+    raise NotImplementedError("TODO(team): save_wav — see docstring")

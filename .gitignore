@@ -1,0 +1,44 @@
+# ---- Secrets: never commit private keys (demo-only keys live in keys/private, ignored) ----
+keys/private/
+*.pem
+!keys/public/*.pem
+*.key
+.env
+.env.*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ---- Node / Vite ----
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# ---- Scratch outputs (keep curated samples/evidence tracked) ----
+tmp/
+out/
+
+# ---- Build output ----
+# Ignored during development. At feature freeze, force-add it on the submission
+# tag (`git add -f frontend/dist`) so the marker needs only Python, no Node.
+frontend/dist/
