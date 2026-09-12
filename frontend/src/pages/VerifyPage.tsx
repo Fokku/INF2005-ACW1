@@ -7,6 +7,7 @@ import { ErrorNotice } from '../components/NotImplemented'
 import { PayloadPreview } from '../components/PayloadPreview'
 import { ReportPanel } from '../components/ReportPanel'
 import { StartLocationPanel } from '../components/StartLocationPanel'
+import { StepSection } from '../components/StepSection'
 import { VerdictBadge } from '../components/VerdictBadge'
 import type { StartMode, VerifyReport } from '../types'
 
@@ -61,72 +62,63 @@ export function VerifyPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
       {/* ---------------- Inputs ---------------- */}
-      <section className="space-y-4">
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">1 · The file you received</h2>
-            <FilePicker
-              label="Stego image or audio"
-              accept=".png,.wav,image/png,audio/wav"
-              hint="the file as it arrived"
-              file={stego}
-              onChange={setStego}
-              showHash
+      <section className="space-y-8">
+        <StepSection num="1" title="The file you received">
+          <FilePicker
+            label="Stego image or audio"
+            accept=".png,.wav,image/png,audio/wav"
+            hint="the file as it arrived"
+            file={stego}
+            onChange={setStego}
+            showHash
+          />
+          <p className="text-xs text-base-content/60">
+            Compare the SHA-256 above with the one party A read out before sending. If they differ,
+            the file changed in transit and the payload is probably gone.
+          </p>
+          <Field label="Media ID" hint="agreed with the sender">
+            <input
+              className="input font-exhibit w-full"
+              placeholder={stego?.name ?? 'e.g. Px-x-lena-001'}
+              value={mediaId}
+              onChange={(e) => setMediaId(e.target.value)}
             />
-            <p className="text-xs opacity-60">
-              Compare the SHA-256 above with the one party A read out before sending. If they differ,
-              the file changed in transit and the payload is probably gone.
-            </p>
-            <Field label="Media ID" hint="agreed with the sender">
-              <input
-                className="input w-full font-mono"
-                placeholder={stego?.name ?? 'e.g. Px-x-lena-001'}
-                value={mediaId}
-                onChange={(e) => setMediaId(e.target.value)}
-              />
-            </Field>
-          </div>
-        </div>
+          </Field>
+        </StepSection>
 
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">2 · Public key</h2>
-            <FilePicker
-              label="Public key (PEM)"
-              accept=".pem"
-              hint="from keys/public/"
-              file={publicKeyFile}
-              onChange={setPublicKeyFile}
-            />
-            <div className="divider text-xs">or paste it</div>
-            <textarea
-              className="textarea h-24 w-full font-mono text-xs"
-              placeholder="-----BEGIN PUBLIC KEY-----"
-              value={publicKeyText}
-              onChange={(e) => setPublicKeyText(e.target.value)}
-            />
-          </div>
-        </div>
+        <StepSection num="2" title="Public key">
+          <FilePicker
+            label="Public key (PEM)"
+            accept=".pem"
+            hint="from keys/public/"
+            file={publicKeyFile}
+            onChange={setPublicKeyFile}
+          />
+          <div className="divider text-xs">or paste it</div>
+          <textarea
+            className="textarea font-exhibit h-24 w-full text-xs"
+            placeholder="-----BEGIN PUBLIC KEY-----"
+            value={publicKeyText}
+            onChange={(e) => setPublicKeyText(e.target.value)}
+          />
+        </StepSection>
 
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">3 · Extraction settings</h2>
-            <LsbSelector value={nLsb} onChange={setNLsb} />
-            <p className="text-xs opacity-60">
-              This must match what party A used. Pick the wrong number and the frame will not parse.
-            </p>
-            <StartLocationPanel
-              mode={startMode}
-              onModeChange={setStartMode}
-              passphrase={passphrase}
-              onPassphraseChange={setPassphrase}
-              explicitStart={explicitStart}
-              onExplicitStartChange={setExplicitStart}
-            />
-          </div>
-        </div>
+        <StepSection num="3" title="Extraction settings">
+          <LsbSelector value={nLsb} onChange={setNLsb} />
+          <p className="text-xs text-base-content/60">
+            This must match what party A used. Pick the wrong number and the frame will not parse.
+          </p>
+          <StartLocationPanel
+            mode={startMode}
+            onModeChange={setStartMode}
+            passphrase={passphrase}
+            onPassphraseChange={setPassphrase}
+            explicitStart={explicitStart}
+            onExplicitStartChange={setExplicitStart}
+          />
+        </StepSection>
 
         <button
           type="button"
@@ -140,42 +132,34 @@ export function VerifyPage() {
       </section>
 
       {/* ---------------- Results ---------------- */}
-      <section className="space-y-4">
+      <section className="space-y-6">
         {error != null && <ErrorNotice error={error} />}
 
         {report && (
           <>
             <VerdictBadge verdict={report.verdict} reasons={report.reasons} />
             <ReportPanel report={report} />
-            {report.payload && (
-              <div className="card bg-base-100 shadow-sm">
-                <div className="card-body">
-                  <PayloadPreview payload={report.payload} />
-                </div>
-              </div>
-            )}
+            {report.payload && <PayloadPreview payload={report.payload} />}
           </>
         )}
 
         {stego && (
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body">
-              <h3 className="font-medium">Received file</h3>
-              {isAudio ? (
-                <audio controls src={stegoUrl ?? undefined} className="w-full" />
-              ) : (
-                <img
-                  src={stegoUrl ?? undefined}
-                  alt="received stego object"
-                  className="max-h-80 rounded-lg border border-base-300 object-contain"
-                />
-              )}
-            </div>
+          <div>
+            <h3 className="font-stamp mb-2 text-lg">Received file</h3>
+            {isAudio ? (
+              <audio controls src={stegoUrl ?? undefined} className="w-full" />
+            ) : (
+              <img
+                src={stegoUrl ?? undefined}
+                alt="received stego object"
+                className="border-base-300 max-h-80 rounded-sm border object-contain"
+              />
+            )}
           </div>
         )}
 
         {!report && !error && (
-          <div className="rounded-lg border border-dashed border-base-300 p-6 text-center text-sm opacity-50">
+          <div className="border-base-300 text-base-content/50 border border-dashed p-6 text-center text-sm">
             The verdict and its evidence will appear here.
           </div>
         )}

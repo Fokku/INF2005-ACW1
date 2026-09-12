@@ -1,4 +1,5 @@
 import type { PayloadInfo } from '../types'
+import { Exhibit } from './Exhibit'
 
 /**
  * The extracted hidden message, displayed or PLAYED according to its type.
@@ -14,21 +15,21 @@ export function PayloadPreview({ payload }: { payload: PayloadInfo }) {
   const mime = payload.message_mime
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium">Extracted payload</span>
-        <span className="badge badge-ghost badge-sm font-mono">{mime}</span>
+        <h3 className="font-stamp text-lg">Extracted payload</h3>
+        <span className="font-exhibit text-xs text-base-content/60">{mime}</span>
         {payload.message_encrypted && (
-          <span className="badge badge-info badge-sm">decrypted with AES-256-GCM</span>
+          <span className="badge badge-primary badge-sm">decrypted with AES-256-GCM</span>
         )}
       </div>
 
       {payload.message_text !== null && payload.message_text !== undefined ? (
-        <pre className="max-h-64 overflow-auto rounded-lg border border-base-300 bg-base-200 p-3 text-sm whitespace-pre-wrap">
+        <pre className="border-base-300 bg-base-200 max-h-64 overflow-auto rounded-sm border p-3 text-sm whitespace-pre-wrap">
           {payload.message_text}
         </pre>
       ) : file && mime.startsWith('image/') ? (
-        <img src={file.url} alt="extracted payload" className="max-h-64 rounded-lg border border-base-300" />
+        <img src={file.url} alt="extracted payload" className="border-base-300 max-h-64 rounded-sm border" />
       ) : file && mime.startsWith('audio/') ? (
         <audio controls src={file.url} className="w-full" />
       ) : file ? (
@@ -36,29 +37,23 @@ export function PayloadPreview({ payload }: { payload: PayloadInfo }) {
           Download {file.filename}
         </a>
       ) : (
-        <p className="text-sm opacity-50">No message content returned.</p>
+        <p className="text-sm text-base-content/50">No message content returned.</p>
       )}
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-        <dt className="opacity-60">Media ID</dt>
-        <dd className="font-mono break-all">{payload.media_id}</dd>
-        <dt className="opacity-60">Signed at</dt>
-        <dd className="font-mono">{payload.timestamp}</dd>
-        <dt className="opacity-60">Nonce</dt>
-        <dd className="font-mono break-all">{payload.nonce}</dd>
-        <dt className="opacity-60">Media hash</dt>
-        <dd className="font-mono break-all">{payload.media_hash}</dd>
-        <dt className="opacity-60">Bound parameters</dt>
-        <dd className="font-mono">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Exhibit label="Media ID">{payload.media_id}</Exhibit>
+        <Exhibit label="Signed at">{payload.timestamp}</Exhibit>
+        <Exhibit label="Nonce">{payload.nonce}</Exhibit>
+        <Exhibit label="Media hash">{payload.media_hash}</Exhibit>
+        <Exhibit label="Bound parameters">
           {payload.cover_kind}, {payload.n_lsb} LSB, shape [{payload.shape.join(', ')}]
-        </dd>
+        </Exhibit>
         {Object.entries(payload.metadata).map(([key, value]) => (
-          <div key={key} className="contents">
-            <dt className="opacity-60">{key}</dt>
-            <dd className="break-all">{value}</dd>
-          </div>
+          <Exhibit key={key} label={key}>
+            {value}
+          </Exhibit>
         ))}
-      </dl>
+      </div>
     </div>
   )
 }

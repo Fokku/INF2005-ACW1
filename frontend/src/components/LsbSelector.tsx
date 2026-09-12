@@ -32,29 +32,34 @@ export function LsbSelector({
   const quality = QUALITY[value]
   return (
     <div className="w-full">
-      <div className="mb-1 flex items-baseline justify-between">
-        <label htmlFor="lsb-range" className="text-sm font-medium">
-          Least-significant bits
-        </label>
-        <span className="badge badge-primary badge-sm font-mono">{value}</span>
-      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <label htmlFor="lsb-range" className="text-sm font-medium text-base-content/80">
+            Least-significant bits
+          </label>
 
-      <input
-        id="lsb-range"
-        type="range"
-        min={1}
-        max={8}
-        step={1}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="range range-primary range-sm w-full"
-      />
+          <input
+            id="lsb-range"
+            type="range"
+            min={1}
+            max={8}
+            step={1}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="range range-primary range-sm mt-2 w-full"
+          />
 
-      <div className="mt-1 flex justify-between px-1 text-xs opacity-50">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-          <span key={n}>{n}</span>
-        ))}
+          <div className="mt-1 flex justify-between px-1 text-xs text-base-content/40">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+              <span key={n}>{n}</span>
+            ))}
+          </div>
+        </div>
+
+        <span className="font-stamp text-primary w-10 shrink-0 text-center text-4xl leading-none">
+          {value}
+        </span>
       </div>
 
       <p className={`mt-2 text-xs ${quality.tone}`}>{quality.text}</p>

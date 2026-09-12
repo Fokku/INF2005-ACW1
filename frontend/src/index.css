@@ -1,18 +1,127 @@
 /* Tailwind CSS v4 is configured in CSS, not in a JS config file.
    There is no tailwind.config.js and no PostCSS step: the @tailwindcss/vite
    plugin in vite.config.ts does everything. */
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Condensed:wght@700;900&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Martian+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 @plugin 'daisyui';
 
-/* One place for the six verdict colours, so the palette stays consistent
-   across the badge, the report panel and the attack lab. */
+/* Case-file theme: see docs/design/gui-design.md for the full rationale.
+   Dark, ink/slate base (tinted blue-slate, h≈250), one amber "stamp-ink"
+   signal accent, and per-verdict semantic hues so a verdict reads by colour
+   alone from across a room. */
+@plugin 'daisyui/theme' {
+  name: 'casefile';
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(0.16 0.014 250);
+  --color-base-200: oklch(0.2 0.016 250);
+  --color-base-300: oklch(0.36 0.018 250);
+  --color-base-content: oklch(0.88 0.008 250);
+
+  --color-primary: oklch(0.72 0.16 55);
+  --color-primary-content: oklch(0.18 0.03 55);
+  --color-secondary: oklch(0.36 0.018 250);
+  --color-secondary-content: oklch(0.88 0.008 250);
+  --color-accent: oklch(0.72 0.16 55);
+  --color-accent-content: oklch(0.18 0.03 55);
+  --color-neutral: oklch(0.25 0.018 250);
+  --color-neutral-content: oklch(0.88 0.008 250);
+
+  --color-success: oklch(0.72 0.15 150);
+  --color-success-content: oklch(0.18 0.03 150);
+  --color-warning: oklch(0.78 0.15 80);
+  --color-warning-content: oklch(0.2 0.03 80);
+  --color-error: oklch(0.63 0.19 25);
+  --color-error-content: oklch(0.97 0.006 25);
+  --color-info: oklch(0.55 0.014 250);
+  --color-info-content: oklch(0.97 0.004 250);
+
+  --radius-box: 0.125rem;
+  --radius-field: 0.125rem;
+  --radius-selector: 0.125rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* --- Type system: stamp / body / exhibit, see docs/design/gui-design.md §1 --- */
 @theme {
-  --color-verdict-authentic: oklch(0.72 0.19 149);
-  --color-verdict-tampered: oklch(0.64 0.21 25);
-  --color-verdict-invalid: oklch(0.65 0.2 15);
-  --color-verdict-missing: oklch(0.7 0.16 70);
-  --color-verdict-location: oklch(0.75 0.15 85);
-  --color-verdict-unknown: oklch(0.6 0.02 260);
+  --font-stamp: 'Big Shoulders Condensed', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-exhibit: 'Martian Mono', ui-monospace, monospace;
+
+  --color-verdict-authentic: oklch(0.72 0.15 150);
+  --color-verdict-tampered: oklch(0.63 0.19 25);
+  --color-verdict-invalid: oklch(0.63 0.19 25);
+  --color-verdict-missing: oklch(0.78 0.15 80);
+  --color-verdict-location: oklch(0.78 0.15 80);
+  --color-verdict-unknown: oklch(0.6 0.01 250);
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+/* Stamped labels: tab names, verdict word, section/step headers. Uppercase +
+   a touch of tracking — condensed faces need opening at small sizes, not
+   tightening. */
+.font-stamp {
+  font-family: var(--font-stamp);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Byte-level data — hashes, hex, offsets, nonces, signatures — and nothing
+   else. Never used for decoration or for "technical" prose. */
+.font-exhibit {
+  font-family: var(--font-exhibit);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* A labeled block of exhibit data, styled like an evidence tag: sharp
+   corners (not the soft radius used elsewhere), a border, and a stable place
+   for a long hash to wrap without ellipsis. */
+.exhibit {
+  background: var(--color-neutral);
+  border: 1px solid var(--color-base-300);
+  border-radius: 2px;
+  padding: 0.625rem 0.875rem;
+}
+.exhibit__label {
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.25rem;
+}
+.exhibit__value {
+  font-family: var(--font-exhibit);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--color-base-content);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+
+/* Case-file step marker: a square numeral, not a circular dot. */
+.step-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  font-family: var(--font-stamp);
+  font-weight: 900;
+  font-size: 1.125rem;
+  color: var(--color-base-100);
+  background: var(--color-primary);
+  border-radius: 2px;
 }
 
 /* Zoomed image comparison should show hard pixel edges, not a blur — that is

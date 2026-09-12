@@ -1,53 +1,93 @@
 import type { Verdict } from '../types'
 
 /**
- * The verdict, rendered as a coloured alert with its reasons.
+ * The verdict, rendered as a full-width stamp — the single most important
+ * visual moment in the app (see docs/design/gui-design.md §4). Color + a
+ * short stamped word, readable from across a room, never buried in prose.
  *
- * Complete — no TODO. Note the literal class strings in VERDICT_STYLE: Tailwind
- * v4 only emits classes it can SEE in the source, so building them at runtime
- * (`alert-${kind}`) would produce unstyled output.
+ * Complete — no TODO. Literal class strings on purpose: Tailwind v4 only
+ * emits classes it can see in the source, so building them at runtime would
+ * produce unstyled output.
  */
 
-const VERDICT_STYLE: Record<Verdict, { alert: string; badge: string; icon: string }> = {
-  Authentic: { alert: 'alert-success', badge: 'badge-success', icon: '✓' },
-  Tampered: { alert: 'alert-error', badge: 'badge-error', icon: '✗' },
-  'Signature Invalid': { alert: 'alert-error', badge: 'badge-error', icon: '✗' },
-  'Payload Missing': { alert: 'alert-warning', badge: 'badge-warning', icon: '∅' },
-  'Wrong Start Location': { alert: 'alert-warning', badge: 'badge-warning', icon: '⌖' },
-  'Cannot Verify': { alert: 'alert-info', badge: 'badge-neutral', icon: '?' },
+const VERDICT_STYLE: Record<Verdict, { text: string; bg: string; border: string; glyph: string }> = {
+  Authentic: {
+    text: 'text-verdict-authentic',
+    bg: 'bg-verdict-authentic/15',
+    border: 'border-verdict-authentic',
+    glyph: '▣',
+  },
+  Tampered: {
+    text: 'text-verdict-tampered',
+    bg: 'bg-verdict-tampered/15',
+    border: 'border-verdict-tampered',
+    glyph: '✕',
+  },
+  'Signature Invalid': {
+    text: 'text-verdict-invalid',
+    bg: 'bg-verdict-invalid/15',
+    border: 'border-verdict-invalid',
+    glyph: '✕',
+  },
+  'Payload Missing': {
+    text: 'text-verdict-missing',
+    bg: 'bg-verdict-missing/15',
+    border: 'border-verdict-missing',
+    glyph: '∅',
+  },
+  'Wrong Start Location': {
+    text: 'text-verdict-location',
+    bg: 'bg-verdict-location/15',
+    border: 'border-verdict-location',
+    glyph: '⌖',
+  },
+  'Cannot Verify': {
+    text: 'text-verdict-unknown',
+    bg: 'bg-verdict-unknown/15',
+    border: 'border-verdict-unknown',
+    glyph: '?',
+  },
 }
 
-const VERDICT_MEANING: Record<Verdict, string> = {
-  Authentic: 'Payload found, signature valid, media hash matches.',
-  Tampered: 'The payload is genuine but the media or the payload has been altered since signing.',
-  'Signature Invalid': 'A payload was found, but it was not signed by the expected key.',
-  'Payload Missing': 'No hidden payload anywhere in this file.',
-  'Wrong Start Location': 'A payload exists, but not where the supplied key or offset points.',
-  'Cannot Verify': 'Not enough information to judge: unsupported file, or a missing/invalid key.',
+const VERDICT_SENTENCE: Record<Verdict, string> = {
+  Authentic: 'Hash and signature match. Nothing has changed since protection.',
+  Tampered: 'Signature is valid, but the media no longer matches its recorded hash.',
+  'Signature Invalid': 'Payload found, but the signature does not verify against this public key.',
+  'Payload Missing': 'No embedded payload found anywhere in this file.',
+  'Wrong Start Location': 'A payload exists, but not at the location this key/offset derives.',
+  'Cannot Verify': 'This file or key could not be processed — see the detail below.',
 }
 
 export function VerdictBadge({ verdict, reasons }: { verdict: Verdict; reasons?: string[] }) {
   const style = VERDICT_STYLE[verdict]
   return (
-    <div className={`alert ${style.alert} items-start`}>
-      <span className="text-2xl leading-none" aria-hidden>
-        {style.icon}
-      </span>
-      <div className="min-w-0">
-        <h3 className="text-lg font-bold">{verdict}</h3>
-        <p className="text-sm opacity-90">{VERDICT_MEANING[verdict]}</p>
-        {reasons && reasons.length > 0 && (
-          <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm opacity-80">
-            {reasons.map((reason, i) => (
-              <li key={i}>{reason}</li>
-            ))}
-          </ul>
-        )}
+    <div className={`border ${style.border} ${style.bg} rounded-sm p-5`}>
+      <div className="flex items-baseline gap-3">
+        <span className={`font-stamp text-3xl leading-none ${style.text}`} aria-hidden>
+          {style.glyph}
+        </span>
+        <h3 className={`font-stamp text-3xl leading-none ${style.text}`}>{verdict}</h3>
       </div>
+      <p className="mt-2 text-sm text-base-content/70">{VERDICT_SENTENCE[verdict]}</p>
+      {reasons && reasons.length > 0 && (
+        <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-base-content/70">
+          {reasons.map((reason, i) => (
+            <li key={i}>{reason}</li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
 
 export function VerdictChip({ verdict }: { verdict: Verdict }) {
-  return <span className={`badge ${VERDICT_STYLE[verdict].badge} badge-sm`}>{verdict}</span>
+  const style = VERDICT_STYLE[verdict]
+  return (
+    <span
+      className={`font-stamp inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-xs ${style.text} ${style.bg} ${style.border}`}
+    >
+      <span aria-hidden>{style.glyph}</span>
+      {verdict}
+    </span>
+  )
 }
