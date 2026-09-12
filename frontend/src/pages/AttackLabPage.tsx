@@ -69,7 +69,7 @@ export function AttackLabPage() {
         <StepSection num="A" title="Target">
           <FilePicker
             label="A protected stego file"
-            accept=".png,.wav,image/png,audio/wav"
+            accept=".png,.wav"
             hint="output from the Protect tab"
             file={stego}
             onChange={setStego}
@@ -97,7 +97,7 @@ export function AttackLabPage() {
           </div>
           <FilePicker
             label="Second cover (replay attack only)"
-            accept=".png,.wav,image/png,audio/wav"
+            accept=".png,.wav"
             hint="where the stolen frame gets transplanted"
             file={otherCover}
             onChange={setOtherCover}

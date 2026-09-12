@@ -101,7 +101,7 @@ export function ProtectPage() {
         <StepSection num="1" title="Cover object">
           <FilePicker
             label="Image or audio to protect"
-            accept=".png,.wav,image/png,audio/wav"
+            accept=".png,.wav"
             hint="PNG or WAV/PCM"
             file={cover}
             onChange={setCover}

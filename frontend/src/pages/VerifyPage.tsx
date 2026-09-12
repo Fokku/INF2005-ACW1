@@ -68,7 +68,7 @@ export function VerifyPage() {
         <StepSection num="1" title="The file you received">
           <FilePicker
             label="Stego image or audio"
-            accept=".png,.wav,image/png,audio/wav"
+            accept=".png,.wav"
             hint="the file as it arrived"
             file={stego}
             onChange={setStego}
