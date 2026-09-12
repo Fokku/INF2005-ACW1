@@ -15,11 +15,11 @@ import { VerifyPage } from './pages/VerifyPage'
 
 type Tab = 'protect' | 'verify' | 'keys' | 'attack'
 
-const TABS: { id: Tab; label: string; blurb: string }[] = [
-  { id: 'protect', label: 'Protect', blurb: 'Party A · embed and sign' },
-  { id: 'verify', label: 'Verify', blurb: 'Party B · extract and judge' },
-  { id: 'keys', label: 'Keys', blurb: 'Generate and inspect signing keys' },
-  { id: 'attack', label: 'Attack Lab', blurb: 'Manufacture the negative cases' },
+const TABS: { id: Tab; num: string; label: string; blurb: string }[] = [
+  { id: 'protect', num: '01', label: 'Protect', blurb: 'Party A · embed and sign' },
+  { id: 'verify', num: '02', label: 'Verify', blurb: 'Party B · extract and judge' },
+  { id: 'keys', num: '03', label: 'Keys', blurb: 'Generate and inspect signing keys' },
+  { id: 'attack', num: '04', label: 'Attack Lab', blurb: 'Manufacture the negative cases' },
 ]
 
 export default function App() {
@@ -36,54 +36,57 @@ export default function App() {
   const active = TABS.find((t) => t.id === tab)!
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen bg-base-100 text-base-content">
       <header className="border-b border-base-300 bg-base-100">
-        <div className="mx-auto max-w-7xl px-4 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="mx-auto max-w-[72rem] px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="text-xl font-bold">Steganographic Integrity Verification</h1>
-              <p className="text-sm opacity-60">
+              <h1 className="font-stamp text-2xl leading-none">Stego / Case File</h1>
+              <p className="mt-1.5 text-sm text-base-content/60">
                 INF2005 ACW1 · LSB steganography, SHA-256 hashing and Ed25519 signatures
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-2 text-xs text-base-content/60">
               <span
                 className={`inline-block size-2 rounded-full ${
                   online === null ? 'bg-base-300' : online ? 'bg-success' : 'bg-error'
                 }`}
               />
-              <span className="opacity-60">
-                {online === null ? 'checking API…' : online ? 'API connected' : 'API unreachable'}
-              </span>
+              <span>{online === null ? 'checking API…' : online ? 'API connected' : 'API unreachable'}</span>
             </div>
           </div>
 
-          <div role="tablist" className="tabs tabs-box mt-4">
+          <nav role="tablist" className="mt-5 flex flex-wrap gap-x-8 gap-y-2">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 role="tab"
                 type="button"
-                className={`tab ${tab === t.id ? 'tab-active' : ''}`}
+                aria-selected={tab === t.id}
                 onClick={() => setTab(t.id)}
+                className={`font-stamp border-b-2 pb-2 text-base transition-colors ${
+                  tab === t.id
+                    ? 'border-primary text-base-content'
+                    : 'border-transparent text-base-content/50 hover:text-base-content/80'
+                }`}
               >
-                {t.label}
+                <span className="text-base-content/40">{t.num}</span> {t.label}
               </button>
             ))}
-          </div>
+          </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">
-        <p className="mb-4 text-sm opacity-60">{active.blurb}</p>
+      <main className="mx-auto max-w-[72rem] px-6 py-8">
+        <p className="mb-6 text-sm text-base-content/60">{active.blurb}</p>
 
         {online === false && (
-          <div className="alert alert-error mb-4 items-start">
+          <div className="alert alert-error mb-6 items-start">
             <span className="text-xl leading-none" aria-hidden>
               ✗
             </span>
             <div>
-              <h3 className="font-bold">The backend is not running</h3>
+              <h3 className="font-medium">The backend is not running</h3>
               <p className="text-sm">
                 Start it with <code>stego serve --reload</code> from an activated virtualenv, then
                 reload this page.
@@ -98,7 +101,7 @@ export default function App() {
         {tab === 'attack' && <AttackLabPage />}
       </main>
 
-      <footer className="border-t border-base-300 py-6 text-center text-xs opacity-50">
+      <footer className="border-t border-base-300 py-6 text-center text-xs text-base-content/50">
         Built for INF2005 ACW1 · see TODO.md for what still needs implementing
       </footer>
     </div>

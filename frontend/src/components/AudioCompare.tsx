@@ -24,8 +24,8 @@ export function AudioCompare({
   return (
     <div className="space-y-3">
       <div>
-        <span className="font-medium">Listening comparison</span>
-        <p className="text-xs opacity-60">
+        <h3 className="font-stamp text-lg">Listening comparison</h3>
+        <p className="text-xs text-base-content/60">
           At 1 or 2 LSBs these should be indistinguishable. Raise the LSB count and the hiss becomes
           obvious — that is the capacity versus perceptibility trade-off.
         </p>
@@ -33,11 +33,11 @@ export function AudioCompare({
 
       {tracks.map((track) => (
         <div key={track.label} className="space-y-1">
-          <span className="text-xs opacity-70">{track.label}</span>
+          <span className="text-xs text-base-content/70">{track.label}</span>
           {track.url ? (
             <audio controls preload="metadata" src={track.url} className="w-full" />
           ) : (
-            <div className="rounded-lg border border-base-300 bg-base-200 p-3 text-xs opacity-40">
+            <div className="border-base-300 bg-base-200 rounded-sm border p-3 text-xs text-base-content/40">
               not available yet
             </div>
           )}

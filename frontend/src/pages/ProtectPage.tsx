@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { CapacityMeter } from '../components/CapacityMeter'
 import { DownloadButton } from '../components/DownloadButton'
+import { Exhibit } from '../components/Exhibit'
 import { Field } from '../components/Field'
 import { FilePicker } from '../components/FilePicker'
 import { ImageCompare } from '../components/ImageCompare'
@@ -9,6 +10,7 @@ import { AudioCompare } from '../components/AudioCompare'
 import { LsbSelector } from '../components/LsbSelector'
 import { ErrorNotice } from '../components/NotImplemented'
 import { StartLocationPanel } from '../components/StartLocationPanel'
+import { StepSection } from '../components/StepSection'
 import { SAMPLE_PAYLOADS } from '../lib/samplePayloads'
 import type { CapacityReport, ProtectResult, StartMode } from '../types'
 
@@ -93,103 +95,91 @@ export function ProtectPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
       {/* ---------------- Inputs ---------------- */}
-      <section className="space-y-4">
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">1 · Cover object</h2>
-            <FilePicker
-              label="Image or audio to protect"
-              accept=".png,.wav,image/png,audio/wav"
-              hint="PNG or WAV/PCM"
-              file={cover}
-              onChange={setCover}
-              showHash
+      <section className="space-y-8">
+        <StepSection num="1" title="Cover object">
+          <FilePicker
+            label="Image or audio to protect"
+            accept=".png,.wav"
+            hint="PNG or WAV/PCM"
+            file={cover}
+            onChange={setCover}
+            showHash
+          />
+          <Field label="Media ID" hint="signed into the payload">
+            <input
+              className="input font-exhibit w-full"
+              placeholder={cover?.name ?? 'e.g. Px-x-lena-001'}
+              value={mediaId}
+              onChange={(e) => setMediaId(e.target.value)}
             />
-            <Field label="Media ID" hint="signed into the payload">
+          </Field>
+        </StepSection>
+
+        <StepSection num="2" title="Message to hide">
+          <div className="flex flex-wrap gap-2">
+            {SAMPLE_PAYLOADS.map((sample) => (
+              <button
+                key={sample.id}
+                type="button"
+                className="btn btn-outline btn-xs"
+                onClick={() => setMessageText(sample.text)}
+                title={sample.description}
+              >
+                {sample.label}
+              </button>
+            ))}
+          </div>
+          <textarea
+            className="textarea font-exhibit h-32 w-full text-sm"
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+          />
+          <div className="flex items-center justify-between">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
-                className="input w-full font-mono"
-                placeholder={cover?.name ?? 'e.g. Px-x-lena-001'}
-                value={mediaId}
-                onChange={(e) => setMediaId(e.target.value)}
+                type="checkbox"
+                className="checkbox checkbox-sm checkbox-primary"
+                checked={encrypt}
+                onChange={(e) => setEncrypt(e.target.checked)}
               />
-            </Field>
+              <span>Encrypt message (AES-256-GCM)</span>
+            </label>
+            <span className="font-exhibit text-xs text-base-content/60">{messageBytes} bytes</span>
           </div>
-        </div>
+        </StepSection>
 
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">2 · Message to hide</h2>
-            <div className="flex flex-wrap gap-2">
-              {SAMPLE_PAYLOADS.map((sample) => (
-                <button
-                  key={sample.id}
-                  type="button"
-                  className="btn btn-outline btn-xs"
-                  onClick={() => setMessageText(sample.text)}
-                  title={sample.description}
-                >
-                  {sample.label}
-                </button>
-              ))}
-            </div>
-            <textarea
-              className="textarea h-32 w-full font-mono text-sm"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-            />
-            <div className="flex items-center justify-between">
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={encrypt}
-                  onChange={(e) => setEncrypt(e.target.checked)}
-                />
-                <span>Encrypt message (AES-256-GCM)</span>
-              </label>
-              <span className="text-xs opacity-60">{messageBytes} bytes</span>
-            </div>
-          </div>
-        </div>
+        <StepSection num="3" title="Embedding settings">
+          <LsbSelector value={nLsb} onChange={setNLsb} />
+          <CapacityMeter report={capacity} messageBytes={messageBytes} />
+          <StartLocationPanel
+            mode={startMode}
+            onModeChange={setStartMode}
+            passphrase={passphrase}
+            onPassphraseChange={setPassphrase}
+            explicitStart={explicitStart}
+            onExplicitStartChange={setExplicitStart}
+            maxStart={capacity?.total_elements}
+          />
+        </StepSection>
 
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">3 · Embedding settings</h2>
-            <LsbSelector value={nLsb} onChange={setNLsb} />
-            <CapacityMeter report={capacity} messageBytes={messageBytes} />
-            <StartLocationPanel
-              mode={startMode}
-              onModeChange={setStartMode}
-              passphrase={passphrase}
-              onPassphraseChange={setPassphrase}
-              explicitStart={explicitStart}
-              onExplicitStartChange={setExplicitStart}
-              maxStart={capacity?.total_elements}
+        <StepSection num="4" title="Signing key">
+          <FilePicker
+            label="Private key (PEM)"
+            accept=".pem"
+            hint="demo key from the Keys tab"
+            file={privateKey}
+            onChange={setPrivateKey}
+          />
+          <Field label="Team metadata (JSON)">
+            <input
+              className="input font-exhibit w-full text-sm"
+              value={metadataJson}
+              onChange={(e) => setMetadataJson(e.target.value)}
             />
-          </div>
-        </div>
-
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">4 · Signing key</h2>
-            <FilePicker
-              label="Private key (PEM)"
-              accept=".pem"
-              hint="demo key from the Keys tab"
-              file={privateKey}
-              onChange={setPrivateKey}
-            />
-            <Field label="Team metadata (JSON)">
-              <input
-                className="input w-full font-mono text-sm"
-                value={metadataJson}
-                onChange={(e) => setMetadataJson(e.target.value)}
-              />
-            </Field>
-          </div>
-        </div>
+          </Field>
+        </StepSection>
 
         <button
           type="button"
@@ -203,49 +193,38 @@ export function ProtectPage() {
       </section>
 
       {/* ---------------- Results ---------------- */}
-      <section className="space-y-4">
+      <section className="space-y-6">
         {error != null && <ErrorNotice error={error} />}
 
         {result && (
           <>
             <DownloadButton file={result.stego} />
-            <div className="card bg-base-100 shadow-sm">
-              <div className="card-body">
-                <h2 className="card-title text-base">Embedding report</h2>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                  <dt className="opacity-60">Start offset</dt>
-                  <dd className="font-mono">
-                    element {result.start_offset.toLocaleString()} ({result.start_mode})
-                  </dd>
-                  <dt className="opacity-60">Frame size</dt>
-                  <dd className="font-mono">{result.frame_bytes} bytes</dd>
-                  <dt className="opacity-60">Capacity used</dt>
-                  <dd className="font-mono">
-                    {((result.frame_bytes / result.capacity_bytes) * 100).toFixed(2)}%
-                  </dd>
-                  <dt className="opacity-60">Media hash</dt>
-                  <dd className="font-mono break-all">{result.payload.media_hash}</dd>
-                  <dt className="opacity-60">Signature</dt>
-                  <dd className="font-mono break-all">{result.signature_b64}</dd>
-                </dl>
+            <div>
+              <h2 className="font-stamp mb-3 text-lg">Embedding report</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Exhibit label="Start offset">
+                  element {result.start_offset.toLocaleString()} ({result.start_mode})
+                </Exhibit>
+                <Exhibit label="Frame size">{result.frame_bytes} bytes</Exhibit>
+                <Exhibit label="Capacity used">
+                  {((result.frame_bytes / result.capacity_bytes) * 100).toFixed(2)}%
+                </Exhibit>
+                <Exhibit label="Media hash">{result.payload.media_hash}</Exhibit>
+                <Exhibit label="Signature">{result.signature_b64}</Exhibit>
               </div>
             </div>
           </>
         )}
 
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body">
-            {coverKind === 'audio' ? (
-              <AudioCompare coverUrl={coverUrl} stegoUrl={result?.stego.url ?? null} />
-            ) : (
-              <ImageCompare
-                coverUrl={coverUrl}
-                stegoUrl={result?.stego.url ?? null}
-                diffUrl={result?.diff?.url ?? null}
-              />
-            )}
-          </div>
-        </div>
+        {coverKind === 'audio' ? (
+          <AudioCompare coverUrl={coverUrl} stegoUrl={result?.stego.url ?? null} />
+        ) : (
+          <ImageCompare
+            coverUrl={coverUrl}
+            stegoUrl={result?.stego.url ?? null}
+            diffUrl={result?.diff?.url ?? null}
+          />
+        )}
       </section>
     </div>
   )

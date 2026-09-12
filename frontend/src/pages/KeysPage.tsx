@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api/client'
+import { Exhibit } from '../components/Exhibit'
 import { Field } from '../components/Field'
 import { ErrorNotice } from '../components/NotImplemented'
 import type { KeyPairResult } from '../types'
@@ -29,19 +30,19 @@ export function KeysPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <section className="space-y-4">
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body gap-4">
-            <h2 className="card-title text-base">Generate a demo key pair</h2>
-            <p className="text-sm opacity-70">
-              Ed25519. The private key signs the payload; the public key is what a verifier needs.
-              These keys exist only for the assignment demo — in a real deployment the private key
-              would never leave the signer's machine, let alone be generated in a browser.
-            </p>
+    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
+      <section className="space-y-6">
+        <div>
+          <h2 className="font-stamp text-lg">Generate a demo key pair</h2>
+          <p className="mt-2 text-sm text-base-content/70">
+            Ed25519. The private key signs the payload; the public key is what a verifier needs.
+            These keys exist only for the assignment demo — in a real deployment the private key
+            would never leave the signer's machine, let alone be generated in a browser.
+          </p>
+          <div className="mt-4 space-y-4">
             <Field label="Key label">
               <input
-                className="input w-full font-mono"
+                className="input font-exhibit w-full"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
               />
@@ -58,49 +59,38 @@ export function KeysPage() {
           </div>
         </div>
 
-        <div className="alert alert-warning items-start text-sm">
-          <span className="text-lg leading-none" aria-hidden>
-            ⚠
-          </span>
-          <div>
-            <p className="font-medium">Never commit a private key.</p>
-            <p className="opacity-80">
-              Save it under <code>keys/private/</code>, which is gitignored. Only the public key
-              belongs in the repository, and only that is submitted.
-            </p>
-          </div>
-        </div>
+        <p className="text-xs tracking-wide text-base-content/60 uppercase">
+          Private key never leaves this machine — save it under{' '}
+          <code className="font-exhibit normal-case">keys/private/</code>, which is gitignored. Only
+          the public key belongs in the repository.
+        </p>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-6">
         {error != null && <ErrorNotice error={error} />}
 
         {pair && (
           <>
-            <div className="card bg-base-100 shadow-sm">
-              <div className="card-body gap-3">
-                <h2 className="card-title text-base">Key details</h2>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                  <dt className="opacity-60">Algorithm</dt>
-                  <dd className="font-mono">{pair.key.algorithm}</dd>
-                  <dt className="opacity-60">Fingerprint</dt>
-                  <dd className="font-mono break-all">{pair.key.fingerprint}</dd>
-                </dl>
-                <p className="text-xs opacity-60">
-                  Read the fingerprint out to party B. If their copy matches, you are both using the
-                  same key and a valid signature really does mean what it looks like.
-                </p>
-                <pre className="max-h-40 overflow-auto rounded-lg border border-base-300 bg-base-200 p-3 text-xs">
-                  {pair.key.public_key_pem}
-                </pre>
+            <div className="space-y-3">
+              <h2 className="font-stamp text-lg">Key details</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Exhibit label="Algorithm">{pair.key.algorithm}</Exhibit>
+                <Exhibit label="Fingerprint">{pair.key.fingerprint}</Exhibit>
               </div>
+              <p className="text-xs text-base-content/60">
+                Read the fingerprint out to party B. If their copy matches, you are both using the
+                same key and a valid signature really does mean what it looks like.
+              </p>
+              <Exhibit label="Public key (PEM)">
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap">{pair.key.public_key_pem}</pre>
+              </Exhibit>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <a href={pair.public_key_file.download_url} download className="btn btn-success btn-sm">
+              <a href={pair.public_key_file.download_url} download className="btn btn-primary btn-sm">
                 Download public key
               </a>
-              <a href={pair.private_key_file.download_url} download className="btn btn-warning btn-sm">
+              <a href={pair.private_key_file.download_url} download className="btn btn-outline btn-sm">
                 Download private key
               </a>
             </div>
@@ -108,7 +98,7 @@ export function KeysPage() {
         )}
 
         {!pair && !error && (
-          <div className="rounded-lg border border-dashed border-base-300 p-6 text-center text-sm opacity-50">
+          <div className="border-base-300 text-base-content/50 border border-dashed p-6 text-center text-sm">
             Generated keys will appear here.
           </div>
         )}

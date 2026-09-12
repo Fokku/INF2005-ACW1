@@ -10,11 +10,13 @@ Rules for this module (from TECH_STACK.md):
 
 from __future__ import annotations
 
+import io
 from dataclasses import dataclass
 
 import numpy as np
+from PIL import Image
 
-from .errors import UnsupportedCoverError  # noqa: F401  (used once implemented)
+from .errors import UnsupportedCoverError
 
 
 @dataclass
@@ -45,7 +47,35 @@ def load_png(data: bytes) -> ImageCover:
     transparent pixel can hide bits invisibly — that is fine here, but say so in
     the design doc. Simplest defensible choice: normalise everything to RGB.
     """
-    raise NotImplementedError("TODO(team): load_png — see docstring")
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception as exc:  # Pillow raises various subclasses of OSError
+        raise UnsupportedCoverError("could not decode image data as PNG") from exc
+
+    if img.format != "PNG":
+        raise UnsupportedCoverError(f"unsupported image format: {img.format!r} (PNG only)")
+
+    original_mode = img.mode
+
+    if original_mode == "RGBA":
+        target_mode = "RGBA"
+    elif original_mode in ("P", "L", "LA", "RGB", "1"):
+        target_mode = "RGB"
+    else:
+        # e.g. "I", "I;16", "F" — 16-bit / floating point PNGs are out of scope.
+        raise UnsupportedCoverError(f"unsupported PNG mode: {original_mode!r}")
+
+    img = img.convert(target_mode)
+    arr = np.asarray(img, dtype=np.uint8)  # (h, w, c)
+    height, width, channels = arr.shape
+    return ImageCover(
+        elements=arr.reshape(-1).copy(),
+        height=height,
+        width=width,
+        channels=channels,
+        original_mode=original_mode,
+    )
 
 
 def save_png(cover: ImageCover, elements: np.ndarray) -> bytes:
@@ -60,7 +90,12 @@ def save_png(cover: ImageCover, elements: np.ndarray) -> bytes:
     Do not pass quality/lossy options. Verify with a round-trip test that
     load_png(save_png(x)) returns identical elements.
     """
-    raise NotImplementedError("TODO(team): save_png — see docstring")
+    mode = "RGBA" if cover.channels == 4 else "RGB"
+    arr = elements.reshape(cover.height, cover.width, cover.channels)
+    img = Image.fromarray(arr, mode=mode)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=False)
+    return buf.getvalue()
 
 
 def lsb_plane_png(cover: ImageCover, elements: np.ndarray, n_lsb: int) -> bytes:
@@ -75,4 +110,11 @@ def lsb_plane_png(cover: ImageCover, elements: np.ndarray, n_lsb: int) -> bytes:
     Sketch: take elements & ((1<<n_lsb)-1), multiply by 255 // ((1<<n_lsb)-1),
     reshape, save as PNG.
     """
-    raise NotImplementedError("TODO(team): lsb_plane_png — optional, see docstring")
+    max_val = (1 << n_lsb) - 1
+    plane = (elements & max_val).astype(np.uint8) * (255 // max_val)
+    arr = plane.reshape(cover.height, cover.width, cover.channels)
+    mode = "RGBA" if cover.channels == 4 else "RGB"
+    img = Image.fromarray(arr, mode=mode)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=False)
+    return buf.getvalue()

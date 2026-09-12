@@ -1,5 +1,6 @@
 import type { FileRef } from '../types'
 import { formatBytes } from '../lib/format'
+import { Exhibit } from './Exhibit'
 
 /**
  * Download a produced file, with its SHA-256 next to it.
@@ -14,25 +15,22 @@ import { formatBytes } from '../lib/format'
  */
 export function DownloadButton({ file, label }: { file: FileRef; label?: string }) {
   return (
-    <div className="space-y-2 rounded-lg border border-success/40 bg-success/5 p-4">
+    <div className="border-verdict-authentic bg-verdict-authentic/10 space-y-3 rounded-sm border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-medium">{label ?? 'Stego object ready'}</div>
-          <div className="font-mono text-xs break-all opacity-70">
+          <div className="text-sm font-medium">{label ?? 'Stego object ready'}</div>
+          <div className="font-exhibit text-xs break-all text-base-content/70">
             {file.filename} · {formatBytes(file.size_bytes)}
           </div>
         </div>
-        <a href={file.download_url} download={file.filename} className="btn btn-success btn-sm">
+        <a href={file.download_url} download={file.filename} className="btn btn-primary btn-sm">
           Download
         </a>
       </div>
 
-      <div className="flex items-start gap-2 text-xs">
-        <span className="badge badge-ghost badge-sm shrink-0">SHA-256</span>
-        <code className="break-all opacity-70">{file.sha256}</code>
-      </div>
+      <Exhibit label="SHA-256">{file.sha256}</Exhibit>
 
-      <p className="text-xs opacity-60">
+      <p className="text-xs text-base-content/60">
         Send this as a file attachment. Pasting it inline, or sending it through a messaging app that
         re-compresses images, destroys the hidden payload.
       </p>

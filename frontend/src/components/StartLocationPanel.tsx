@@ -28,25 +28,33 @@ export function StartLocationPanel({
   maxStart?: number
 }) {
   return (
-    <div className="space-y-3 rounded-lg border border-base-300 p-4">
+    <div className="space-y-3">
       <div>
-        <span className="font-medium">Payload start location</span>
-        <p className="text-xs opacity-60">
+        <span className="text-sm font-medium text-base-content/80">Payload start location</span>
+        <p className="text-xs text-base-content/60">
           Never the top-left corner. The decoder must be able to find the same place again.
         </p>
       </div>
 
-      <div className="join w-full">
+      <div className="flex gap-5 border-b border-base-300">
         <button
           type="button"
-          className={`btn join-item flex-1 ${mode === 'derived' ? 'btn-primary' : 'btn-outline'}`}
+          className={`font-stamp -mb-px border-b-2 pb-1.5 text-sm ${
+            mode === 'derived'
+              ? 'border-primary text-base-content'
+              : 'border-transparent text-base-content/50 hover:text-base-content/80'
+          }`}
           onClick={() => onModeChange('derived')}
         >
           Derived from passphrase
         </button>
         <button
           type="button"
-          className={`btn join-item flex-1 ${mode === 'explicit' ? 'btn-primary' : 'btn-outline'}`}
+          className={`font-stamp -mb-px border-b-2 pb-1.5 text-sm ${
+            mode === 'explicit'
+              ? 'border-primary text-base-content'
+              : 'border-transparent text-base-content/50 hover:text-base-content/80'
+          }`}
           onClick={() => onModeChange('explicit')}
         >
           Explicit offset
@@ -85,7 +93,7 @@ export function StartLocationPanel({
               type="number"
               min={0}
               max={maxStart}
-              className="input w-full font-mono"
+              className="input font-exhibit w-full"
               value={explicitStart}
               onChange={(e) => onExplicitStartChange(Number(e.target.value))}
             />

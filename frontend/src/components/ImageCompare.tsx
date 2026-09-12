@@ -31,14 +31,14 @@ export function ImageCompare({
   ]
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="font-medium">Visual comparison</span>
+        <h3 className="font-stamp text-lg">Visual comparison</h3>
         <label className="flex cursor-pointer items-center gap-2 text-xs">
           <span>Pixelated zoom</span>
           <input
             type="checkbox"
-            className="toggle toggle-sm"
+            className="toggle toggle-sm toggle-primary"
             checked={zoom}
             onChange={(e) => setZoom(e.target.checked)}
           />
@@ -48,7 +48,7 @@ export function ImageCompare({
       <div className={`grid gap-3 ${panes.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         {panes.map((pane) => (
           <div key={pane.label} className="space-y-1">
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-base-300 bg-base-200">
+            <div className="border-base-300 bg-base-200 flex aspect-square items-center justify-center overflow-hidden rounded-sm border">
               {pane.url ? (
                 <img
                   src={pane.url}
@@ -56,10 +56,10 @@ export function ImageCompare({
                   className={`max-h-full max-w-full object-contain ${zoom ? 'pixelated scale-[2]' : ''}`}
                 />
               ) : (
-                <span className="text-xs opacity-40">not available yet</span>
+                <span className="text-xs text-base-content/40">not available yet</span>
               )}
             </div>
-            <p className="text-center text-xs opacity-70">{pane.label}</p>
+            <p className="text-center text-xs text-base-content/70">{pane.label}</p>
           </div>
         ))}
       </div>
