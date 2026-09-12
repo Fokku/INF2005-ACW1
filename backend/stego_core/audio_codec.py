@@ -17,11 +17,13 @@ the verdict `Cannot Verify`. Convert demo clips with:
 
 from __future__ import annotations
 
+import io
+import wave
 from dataclasses import dataclass
 
 import numpy as np
 
-from .errors import UnsupportedCoverError  # noqa: F401  (used once implemented)
+from .errors import UnsupportedCoverError
 
 
 @dataclass
@@ -53,7 +55,26 @@ def load_wav(data: bytes) -> AudioCover:
     `wave` raises wave.Error for compressed/exotic files — catch it and re-raise
     as UnsupportedCoverError with a message the GUI can show.
     """
-    raise NotImplementedError("TODO(team): load_wav — see docstring")
+    try:
+        with wave.open(io.BytesIO(data), "rb") as w:
+            nchannels, sampwidth, framerate, nframes = w.getparams()[:4]
+            raw = w.readframes(nframes)
+    except (wave.Error, EOFError) as exc:
+        raise UnsupportedCoverError("could not decode audio data as PCM WAV") from exc
+
+    if sampwidth not in (1, 2):
+        raise UnsupportedCoverError(f"unsupported WAV sample width: {sampwidth * 8}-bit (need 8 or 16-bit PCM)")
+
+    dtype = np.uint8 if sampwidth == 1 else np.int16
+    arr = np.frombuffer(raw, dtype=dtype)
+    elements = arr if sampwidth == 1 else arr.view(np.uint16)
+    return AudioCover(
+        elements=elements.copy(),
+        sample_rate=framerate,
+        channels=nchannels,
+        sample_width=sampwidth,
+        frames=nframes,
+    )
 
 
 def save_wav(cover: AudioCover, elements: np.ndarray) -> bytes:
@@ -68,4 +89,15 @@ def save_wav(cover: AudioCover, elements: np.ndarray) -> bytes:
           w.setnchannels(cover.channels); w.setsampwidth(cover.sample_width)
           w.setframerate(cover.sample_rate); w.writeframes(raw)
     """
-    raise NotImplementedError("TODO(team): save_wav — see docstring")
+    if cover.sample_width == 1:
+        raw = elements.astype(np.uint8).tobytes()
+    else:
+        raw = elements.astype(np.uint16).view(np.int16).tobytes()
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(cover.channels)
+        w.setsampwidth(cover.sample_width)
+        w.setframerate(cover.sample_rate)
+        w.writeframes(raw)
+    return buf.getvalue()
