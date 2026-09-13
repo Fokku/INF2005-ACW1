@@ -45,10 +45,10 @@ Watch out: keep the array dtype, and never do bit operations on `int16`.
 
 Owner: ______  ·  Owner: ______  (split image / audio between two people)
 
-- [ ] `load_png` / `save_png` — lossless round-trip, normalise odd modes to RGB/RGBA
-- [ ] `load_wav` / `save_wav` — 8/16-bit PCM, mono and stereo, WAV header and params preserved
+- [x] `load_png` / `save_png` — lossless round-trip, normalise odd modes to RGB/RGBA
+- [x] `load_wav` / `save_wav` — 8/16-bit PCM, mono and stereo, WAV header and params preserved
 - [ ] Round-trip tests for both: load then save must return identical bytes
-- [ ] `lsb_plane_png` — amplified LSB view for the side-by-side comparison (nice-to-have)
+- [x] `lsb_plane_png` — amplified LSB view for the side-by-side comparison (nice-to-have)
 
 Watch out: 16-bit WAV needs a `uint16` view. Never write JPEG.
 
