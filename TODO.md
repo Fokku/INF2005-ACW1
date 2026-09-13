@@ -47,7 +47,9 @@ Owner: ______  ·  Owner: ______  (split image / audio between two people)
 
 - [x] `load_png` / `save_png` — lossless round-trip, normalise odd modes to RGB/RGBA
 - [x] `load_wav` / `save_wav` — 8/16-bit PCM, mono and stereo, WAV header and params preserved
-- [ ] Round-trip tests for both: load then save must return identical bytes
+- [x] Round-trip tests for both: `tests/test_image_codec.py` and `tests/test_audio_codec.py`
+      (13 tests, all passing) — pixel/sample-identical round-trip, odd-mode normalisation
+      (P/L → RGB), unsupported-format rejection, and the `lsb_plane_png` nice-to-have
 - [x] `lsb_plane_png` — amplified LSB view for the side-by-side comparison (nice-to-have)
 
 Watch out: 16-bit WAV needs a `uint16` view. Never write JPEG.
@@ -181,6 +183,21 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
   - [ ] Wire it through `pipeline.protect` / `pipeline.verify` once those are implemented
         (workstream E) — the docstrings mention `video_codec` but the pipeline body itself still
         raises `NotImplementedError`.
+- [ ] **Robust embedding** — improve payload survival under compression, noise, resampling or
+      mild transformation, using redundancy, error correction (e.g. repetition or Hamming codes)
+      or spread-spectrum techniques. Document the trade-off against raw capacity.
+- [ ] **Attack simulation module** — overlaps workstream F. Extend `attacks.py` beyond the six
+      required functions to also simulate wrong-key verification, payload corruption, wrong
+      start-location extraction, and replay/substitution attempts, each asserting the verdict
+      `attacks.EXPECTED` predicts.
+- [ ] **Advanced start-location security** — overlaps workstream D. Derive the start location from
+      a keyed pseudo-random function, an encrypted header, or a seed phrase (beyond the baseline
+      keyed HMAC in `derive_start`), and write up its limitations in `docs/design/start-location.md`.
+- [ ] **Steganalysis** — using a known algorithm or methodology (e.g. chi-square attack, RS
+      analysis, LSB histogram analysis), analyse one of the project's own stego samples and
+      convincingly infer whether the cover shows signs of a hidden payload. Write up the method
+      and result, ideally as a script under `scripts/` plus a short section in
+      `docs/design/limitations-and-ai-use.md`.
 
 ---
 

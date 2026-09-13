@@ -100,7 +100,7 @@ export function ProtectPage() {
   }
 
   return (
-    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
+    <div className={`grid gap-x-10 gap-y-8 ${cover ? 'lg:grid-cols-2' : ''}`}>
       {/* ---------------- Inputs ---------------- */}
       <section className="space-y-8">
         <StepSection num="1" title="Cover object">
@@ -198,39 +198,43 @@ export function ProtectPage() {
       </section>
 
       {/* ---------------- Results ---------------- */}
-      <section className="space-y-6">
-        {error != null && <ErrorNotice error={error} />}
+      {cover && (
+        <section className="space-y-6">
+          {error != null && <ErrorNotice error={error} />}
 
-        {result && (
-          <>
-            <DownloadButton file={result.stego} />
-            <div>
-              <h2 className="font-stamp mb-3 text-lg">Embedding report</h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Exhibit label="Start offset">
-                  element {result.start_offset.toLocaleString()} ({result.start_mode})
-                </Exhibit>
-                <Exhibit label="Frame size">{result.frame_bytes} bytes</Exhibit>
-                <Exhibit label="Capacity used">
-                  {((result.frame_bytes / result.capacity_bytes) * 100).toFixed(2)}%
-                </Exhibit>
-                <Exhibit label="Media hash">{result.payload.media_hash}</Exhibit>
-                <Exhibit label="Signature">{result.signature_b64}</Exhibit>
+          {result && (
+            <>
+              <DownloadButton file={result.stego} />
+              <div>
+                <h2 className="font-stamp mb-3 text-lg">Embedding report</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Exhibit label="Start offset">
+                    element {result.start_offset.toLocaleString()} ({result.start_mode})
+                  </Exhibit>
+                  <Exhibit label="Frame size">{result.frame_bytes} bytes</Exhibit>
+                  <Exhibit label="Capacity used">
+                    {((result.frame_bytes / result.capacity_bytes) * 100).toFixed(2)}%
+                  </Exhibit>
+                  <Exhibit label="Media hash">{result.payload.media_hash}</Exhibit>
+                  <Exhibit label="Signature">{result.signature_b64}</Exhibit>
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
 
-        {coverKind === 'audio' ? (
-          <AudioCompare coverUrl={coverUrl} stegoUrl={result?.stego.url ?? null} />
-        ) : (
-          <ImageCompare
-            coverUrl={coverUrl}
-            stegoUrl={result?.stego.url ?? null}
-            diffUrl={result?.diff?.url ?? null}
-          />
-        )}
-      </section>
+          {coverKind === 'audio' ? (
+            <AudioCompare coverUrl={coverUrl} stegoUrl={result?.stego.url ?? null} />
+          ) : coverKind === 'video' ? (
+            <VideoCompare coverUrl={coverUrl} stegoUrl={result?.stego.url ?? null} />
+          ) : (
+            <ImageCompare
+              coverUrl={coverUrl}
+              stegoUrl={result?.stego.url ?? null}
+              diffUrl={result?.diff?.url ?? null}
+            />
+          )}
+        </section>
+      )}
     </div>
   )
 }

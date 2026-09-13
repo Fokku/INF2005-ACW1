@@ -152,11 +152,13 @@ export function VerifyPage() {
             ) : isVideo ? (
               <video controls src={stegoUrl ?? undefined} className="w-full rounded-sm" />
             ) : (
-              <img
-                src={stegoUrl ?? undefined}
-                alt="received stego object"
-                className="border-base-300 max-h-80 rounded-sm border object-contain"
-              />
+              <div className="border-base-300 bg-base-200 flex max-h-[32rem] items-center justify-center overflow-hidden rounded-sm border">
+                <img
+                  src={stegoUrl ?? undefined}
+                  alt="received stego object"
+                  className="max-h-[32rem] max-w-full object-contain"
+                />
+              </div>
             )}
           </div>
         )}

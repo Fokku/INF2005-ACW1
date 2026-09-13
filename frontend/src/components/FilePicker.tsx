@@ -47,13 +47,25 @@ export function FilePicker({
           void select(e.dataTransfer.files[0] ?? null)
         }}
         onClick={() => inputRef.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border-2 border-dashed p-4 text-center transition-colors ${
+        className={`relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border-2 border-dashed p-4 text-center transition-colors ${
           dragging ? 'border-primary bg-primary/10' : 'border-base-300 hover:border-primary/50'
         }`}
       >
         {file ? (
           <>
-            <span className="font-exhibit text-sm break-all">{file.name}</span>
+            <button
+              type="button"
+              aria-label="Clear selected file"
+              title="Clear"
+              onClick={(e) => {
+                e.stopPropagation()
+                void select(null)
+              }}
+              className="border-base-300 text-base-content/60 hover:border-error hover:text-error hover:bg-error/10 absolute top-2 right-2 flex size-6 items-center justify-center rounded-sm border text-sm leading-none transition-colors"
+            >
+              ✕
+            </button>
+            <span className="font-exhibit max-w-[85%] text-sm break-all">{file.name}</span>
             <span className="text-xs text-base-content/60">{formatBytes(file.size)}</span>
           </>
         ) : (
@@ -76,12 +88,6 @@ export function FilePicker({
         <div className="mt-2">
           <Exhibit label="SHA-256">{hash}</Exhibit>
         </div>
-      )}
-
-      {file && (
-        <button type="button" className="btn btn-ghost btn-xs mt-1" onClick={() => void select(null)}>
-          Clear
-        </button>
       )}
     </Field>
   )
