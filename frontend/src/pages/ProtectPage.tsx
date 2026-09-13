@@ -7,6 +7,7 @@ import { Field } from '../components/Field'
 import { FilePicker } from '../components/FilePicker'
 import { ImageCompare } from '../components/ImageCompare'
 import { AudioCompare } from '../components/AudioCompare'
+import { VideoCompare } from '../components/VideoCompare'
 import { LsbSelector } from '../components/LsbSelector'
 import { ErrorNotice } from '../components/NotImplemented'
 import { StartLocationPanel } from '../components/StartLocationPanel'
@@ -41,7 +42,11 @@ export function ProtectPage() {
   const [busy, setBusy] = useState(false)
 
   const coverUrl = cover ? URL.createObjectURL(cover) : null
-  const coverKind = cover?.name.toLowerCase().endsWith('.wav') ? 'audio' : 'image'
+  const coverKind = cover?.name.toLowerCase().endsWith('.wav')
+    ? 'audio'
+    : cover?.name.toLowerCase().endsWith('.avi')
+      ? 'video'
+      : 'image'
   const messageBytes = new TextEncoder().encode(messageText).length
 
   // Derived, not stored: with no cover there is nothing to report, and deriving
@@ -100,9 +105,9 @@ export function ProtectPage() {
       <section className="space-y-8">
         <StepSection num="1" title="Cover object">
           <FilePicker
-            label="Image or audio to protect"
-            accept=".png,.wav"
-            hint="PNG or WAV/PCM"
+            label="Image, audio, or video to protect"
+            accept=".png,.wav,.avi"
+            hint="PNG, WAV/PCM, or AVI with a PCM audio track"
             file={cover}
             onChange={setCover}
             showHash

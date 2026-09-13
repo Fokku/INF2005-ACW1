@@ -18,7 +18,7 @@ from .verdict import Verdict
 @dataclass
 class ProtectOptions:
     cover_bytes: bytes
-    cover_kind: str  # "image" | "audio"
+    cover_kind: str  # "image" | "audio" | "video"
     message: bytes
     message_mime: str
     n_lsb: int
@@ -46,7 +46,9 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
     TODO(team): implement.
 
     Order of operations (each step is one call into another module):
-      1. Decode the cover           image_codec.load_png / audio_codec.load_wav
+      1. Decode the cover           image_codec.load_png / audio_codec.load_wav /
+                                    video_codec.load_avi (embeds into the PCM
+                                    audio track; frames are untouched)
       2. Hash it                    hashing.stable_media_hash(elements, n_lsb, header_fields)
       3. Derive keys (if needed)    kdf.derive_keys(passphrase, salt=sha256(media_id))
       4. Encrypt the message        payload.encrypt_message(k_enc, ...)   [optional]
@@ -59,7 +61,8 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
                                     a REQUIRED demo case (spec Section 5)
       9. Choose the start           location.derive_start(...) or opts.explicit_start
      10. Embed                      lsb.bytes_to_bits -> lsb.embed_bits
-     11. Re-encode                  image_codec.save_png / audio_codec.save_wav
+     11. Re-encode                  image_codec.save_png / audio_codec.save_wav /
+                                    video_codec.save_avi
 
     Step 2 must run on the ORIGINAL cover, and the same masked-hash formula must
     reproduce on the stego file — that is the whole point of the stable hash.

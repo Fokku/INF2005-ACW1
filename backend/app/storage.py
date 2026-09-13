@@ -18,6 +18,7 @@ OUT_DIR = Path(__file__).resolve().parents[2] / "out"
 MIME_BY_SUFFIX = {
     ".png": "image/png",
     ".wav": "audio/wav",
+    ".avi": "video/x-msvideo",
     ".txt": "text/plain",
     ".json": "application/json",
     ".pem": "application/x-pem-file",

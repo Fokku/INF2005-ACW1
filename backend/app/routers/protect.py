@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.post("/protect", response_model=ProtectResult)
 async def protect(
-    cover: UploadFile = File(..., description="PNG image or WAV audio"),
+    cover: UploadFile = File(..., description="PNG image, WAV audio, or AVI video"),
     message: UploadFile | None = File(None, description="message file, if not sending text"),
     message_text: str | None = Form(None, description="message typed into the GUI"),
     message_mime: str = Form("text/plain"),
@@ -35,12 +35,15 @@ async def protect(
 
     Steps:
       1. Read the uploads; take the message from `message` or `message_text`.
-      2. Sniff the cover kind (.png -> image, .wav -> audio).
+      2. Sniff the cover kind (.png -> image, .wav -> audio, .avi -> video).
       3. Build pipeline.ProtectOptions from these fields and call pipeline.protect().
       4. storage.save() the stego bytes with a sensible filename
          (e.g. "lena.stego.png") so the download in the A-to-B demo is readable.
       5. For image covers, also save image_codec.lsb_plane_png() as `diff` —
-         it makes the side-by-side comparison convincing.
+         it makes the side-by-side comparison convincing. There is no video-side
+         equivalent: the payload lives in the audio track, not the frames, so an
+         `AudioCompare`-style before/after listen is the right comparison, not a
+         visual diff.
       6. Fill in ProtectResult, including start_offset, frame_bytes,
          capacity_bytes and the decoded payload.
 

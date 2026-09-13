@@ -167,6 +167,23 @@ Code, README, samples, evidence and keys are due **Week 5 Friday**.
 
 ---
 
+## J · Optional challenges (bonus, spec Section 8)
+
+Owner: ______
+
+These are the five official optional challenges. None are required for the core rubric — attempt
+after A–H are green. Pick one or two and go deep rather than spreading thin across all five.
+
+- [x] **Video cover object** — `video_codec.load_avi` / `save_avi` (audio-track embedding, AVI
+      container), `CoverKind.video` / `VideoInfo` in `schemas.py`, `.avi` MIME in `storage.py`, and
+      the Protect/Verify/Attack Lab pages + `VideoCompare.tsx` all done; `tests/test_video_codec.py`
+      is green (5/5).
+  - [ ] Wire it through `pipeline.protect` / `pipeline.verify` once those are implemented
+        (workstream E) — the docstrings mention `video_codec` but the pipeline body itself still
+        raises `NotImplementedError`.
+
+---
+
 ## Definition of done
 
 A workstream is finished when its tests pass, `grep -rn "TODO(team)"` finds nothing in its files,

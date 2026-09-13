@@ -46,8 +46,8 @@ The browser is **display-and-transport only**. It never reads or writes pixel or
 ### Package layout
 
 - `backend/stego_core/` — pure library, **no FastAPI/pydantic imports** (enforce with a tiny architecture test):
-  `lsb.py`, `image_codec.py`, `audio_codec.py`, `hashing.py`, `kdf.py`, `signing.py`, `payload.py`, `container.py`, `location.py`, `verdict.py`, `pipeline.py`, `attacks.py`, `cli.py`
-- `backend/app/` — FastAPI: `main.py` (mounts `/api` routers, then serves `frontend/dist` with `StaticFiles(html=True)` when present), `schemas.py`, `storage.py` (writes outputs to `out/<uuid>.png|wav`, serves `/api/files/{id}` with `Content-Disposition: attachment`; **never base64 in JSON**), `routers/{keys,capacity,protect,verify,attack,files}.py`
+  `lsb.py`, `image_codec.py`, `audio_codec.py`, `video_codec.py`, `hashing.py`, `kdf.py`, `signing.py`, `payload.py`, `container.py`, `location.py`, `verdict.py`, `pipeline.py`, `attacks.py`, `cli.py`
+- `backend/app/` — FastAPI: `main.py` (mounts `/api` routers, then serves `frontend/dist` with `StaticFiles(html=True)` when present), `schemas.py`, `storage.py` (writes outputs to `out/<uuid>.png|wav|avi`, serves `/api/files/{id}` with `Content-Disposition: attachment`; **never base64 in JSON**), `routers/{keys,capacity,protect,verify,attack,files}.py`
 - `backend/tests/`
 - Console scripts: `stego` (`keygen | capacity | protect | verify | tamper | serve`) for scripted evidence, marker reproduction and a rescue path if the UI misbehaves live.
 
@@ -154,7 +154,7 @@ python scripts/make_samples.py         # regenerates samples/ and evidence/logs 
 3. **Bind `n_lsb`, shape, cover kind and media ID into the signed payload** and cross-check them against the frame header at verify time (blocks parameter substitution / replay).
 4. **Bounded magic-byte scan** so the verifier can tell "Wrong Start Location" (magic found elsewhere) from "Payload Missing" (no magic anywhere). State honestly in the limitations section that the magic is scannable.
 5. **Bit operations on `uint8` / `uint16` views only.** Never on `int16` (sign extension corrupts high bits). 8-bit WAV is unsigned; 16-bit is little-endian signed.
-6. **Scope of formats:** 8-bit PNG (RGB/RGBA, normalise others) and 8/16-bit PCM WAV (mono/stereo). Reject 24-bit / float / compressed WAV and JPEG covers with a clear *Cannot Verify* / unsupported message. Convert demo clips with `ffmpeg`.
+6. **Scope of formats:** 8-bit PNG (RGB/RGBA, normalise others), 8/16-bit PCM WAV (mono/stereo), and AVI video with an uncompressed PCM `auds` stream (audio-track embedding — video frames are read but never modified; see `stego_core/video_codec.py`). Reject 24-bit / float / compressed WAV, JPEG covers, and any video without an uncompressed PCM audio track with a clear *Cannot Verify* / unsupported message. Convert demo clips with `ffmpeg` (e.g. `ffmpeg -i input.mp4 -c:v copy -c:a pcm_s16le -ar 44100 output.avi`).
 7. **Stego files leave the server as real files** (`out/<uuid>`, `Content-Disposition: attachment`), never base64 in JSON. A 50 MB WAV would otherwise stall the browser.
 8. **Email transport = file attachment only.** Inline paste, WhatsApp/Teams "photo" mode and "optimise images" re-encode and wipe the LSB plane. Show SHA-256 of the file before send and after download. Script a re-encoded copy as a deliberate *Payload Missing* negative case.
 9. **Never run the Vite dev server in the live demo.** Build once, serve from FastAPI. Rehearse on the actual lab PC, including browser version (Tailwind v4 needs Chrome/Edge/Firefox 128+ or Safari 16.4+).
