@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.post("/capacity", response_model=CapacityReport)
 async def check_capacity(
-    cover: UploadFile = File(..., description="PNG or WAV cover object"),
+    cover: UploadFile = File(..., description="PNG, WAV, or AVI cover object"),
     n_lsb: int = Form(1, ge=1, le=8),
     payload_bytes: int | None = Form(None, description="size of the message the user wants to hide"),
 ) -> CapacityReport:
@@ -24,10 +24,13 @@ async def check_capacity(
 
     Steps:
       1. data = await cover.read()
-      2. Sniff the kind from the filename/content type: .png -> image, .wav -> audio.
-      3. Decode with image_codec.load_png / audio_codec.load_wav (raises
-         UnsupportedCoverError, which main.py already turns into HTTP 415).
-      4. capacity_bits = lsb.capacity_bits(len(elements), n_lsb)
+      2. Sniff the kind from the filename/content type: .png -> image, .wav -> audio,
+         .avi -> video.
+      3. Decode with image_codec.load_png / audio_codec.load_wav / video_codec.load_avi
+         (raises UnsupportedCoverError, which main.py already turns into HTTP 415 —
+         for video this is also how "no PCM audio track" gets reported).
+      4. capacity_bits = lsb.capacity_bits(len(elements), n_lsb) — for video this is
+         the audio track's element count, exactly as for a WAV file.
       5. overhead = container.frame_size_bytes(0, signing.SIGNATURE_BYTES)
          plus a realistic allowance for the JSON payload fields (~300 bytes) —
          document the number you choose.

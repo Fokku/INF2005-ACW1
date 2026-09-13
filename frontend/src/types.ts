@@ -6,7 +6,7 @@
  * YOU must update this file when schemas.py changes. Do it in the same commit.
  */
 
-export type CoverKind = 'image' | 'audio'
+export type CoverKind = 'image' | 'audio' | 'video'
 export type StartMode = 'derived' | 'explicit'
 
 /** The six verdict categories required by the spec (FR10). */
@@ -41,6 +41,17 @@ export interface AudioInfo {
   duration_seconds: number
 }
 
+/** An AVI's PCM audio track (the carrier) plus frame size for display. */
+export interface VideoInfo {
+  frame_width: number
+  frame_height: number
+  duration_seconds: number
+  sample_rate: number
+  channels: number
+  sample_width_bytes: number
+  frames: number
+}
+
 export interface CoverInfo {
   kind: CoverKind
   filename: string
@@ -48,6 +59,7 @@ export interface CoverInfo {
   sha256: string
   image?: ImageInfo | null
   audio?: AudioInfo | null
+  video?: VideoInfo | null
 }
 
 /** A file the backend wrote to out/ and can serve back. */

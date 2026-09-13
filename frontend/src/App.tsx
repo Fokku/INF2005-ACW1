@@ -39,21 +39,11 @@ export default function App() {
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="border-b border-base-300 bg-base-100">
         <div className="mx-auto max-w-[72rem] px-6 py-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="font-stamp text-2xl leading-none">Stego / Case File</h1>
-              <p className="mt-1.5 text-sm text-base-content/60">
-                INF2005 ACW1 · LSB steganography, SHA-256 hashing and Ed25519 signatures
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-base-content/60">
-              <span
-                className={`inline-block size-2 rounded-full ${
-                  online === null ? 'bg-base-300' : online ? 'bg-success' : 'bg-error'
-                }`}
-              />
-              <span>{online === null ? 'checking API…' : online ? 'API connected' : 'API unreachable'}</span>
-            </div>
+          <div>
+            <h1 className="font-stamp text-2xl leading-none">Stego / Case File</h1>
+            <p className="mt-1.5 text-sm text-base-content/60">
+              INF2005 ACW1 · LSB steganography, SHA-256 hashing and Ed25519 signatures
+            </p>
           </div>
 
           <nav role="tablist" className="mt-5 flex flex-wrap gap-x-8 gap-y-2">
@@ -100,10 +90,6 @@ export default function App() {
         {tab === 'keys' && <KeysPage />}
         {tab === 'attack' && <AttackLabPage />}
       </main>
-
-      <footer className="border-t border-base-300 py-6 text-center text-xs text-base-content/50">
-        Built for INF2005 ACW1 · see TODO.md for what still needs implementing
-      </footer>
     </div>
   )
 }

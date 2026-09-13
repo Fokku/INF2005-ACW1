@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.post("/verify", response_model=VerifyReport)
 async def verify(
-    stego: UploadFile = File(..., description="the received PNG or WAV"),
+    stego: UploadFile = File(..., description="the received PNG, WAV, or AVI"),
     public_key_pem: UploadFile | None = File(None),
     public_key_text: str | None = Form(None, description="pasted PEM, as an alternative to uploading"),
     n_lsb: int = Form(1, ge=1, le=8),

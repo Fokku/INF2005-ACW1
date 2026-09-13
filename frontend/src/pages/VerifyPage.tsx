@@ -35,6 +35,7 @@ export function VerifyPage() {
 
   const stegoUrl = stego ? URL.createObjectURL(stego) : null
   const isAudio = stego?.name.toLowerCase().endsWith('.wav') ?? false
+  const isVideo = stego?.name.toLowerCase().endsWith('.avi') ?? false
 
   async function onVerify() {
     if (!stego) return
@@ -67,8 +68,8 @@ export function VerifyPage() {
       <section className="space-y-8">
         <StepSection num="1" title="The file you received">
           <FilePicker
-            label="Stego image or audio"
-            accept=".png,.wav"
+            label="Stego image, audio, or video"
+            accept=".png,.wav,.avi"
             hint="the file as it arrived"
             file={stego}
             onChange={setStego}
@@ -148,12 +149,16 @@ export function VerifyPage() {
             <h3 className="font-stamp mb-2 text-lg">Received file</h3>
             {isAudio ? (
               <audio controls src={stegoUrl ?? undefined} className="w-full" />
+            ) : isVideo ? (
+              <video controls src={stegoUrl ?? undefined} className="w-full rounded-sm" />
             ) : (
-              <img
-                src={stegoUrl ?? undefined}
-                alt="received stego object"
-                className="border-base-300 max-h-80 rounded-sm border object-contain"
-              />
+              <div className="border-base-300 bg-base-200 flex max-h-[32rem] items-center justify-center overflow-hidden rounded-sm border">
+                <img
+                  src={stegoUrl ?? undefined}
+                  alt="received stego object"
+                  className="max-h-[32rem] max-w-full object-contain"
+                />
+              </div>
             )}
           </div>
         )}

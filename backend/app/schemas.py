@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 class CoverKind(str, Enum):
     image = "image"  # PNG, 8-bit RGB/RGBA
     audio = "audio"  # WAV/PCM, 8- or 16-bit, mono/stereo
+    video = "video"  # AVI, PCM audio track carries the payload (frames are untouched)
 
 
 class StartMode(str, Enum):
@@ -73,6 +74,23 @@ class AudioInfo(BaseModel):
     duration_seconds: float
 
 
+class VideoInfo(BaseModel):
+    """The AVI's PCM audio track — the actual carrier — plus frame size for display.
+
+    The payload lives entirely in the fields below the `frame_*` ones; embedding
+    never touches the video stream, so there is no video-side capacity or shape
+    to report (see `stego_core/video_codec.py`).
+    """
+
+    frame_width: int
+    frame_height: int
+    duration_seconds: float
+    sample_rate: int
+    channels: int
+    sample_width_bytes: int  # 1 or 2, same meaning as AudioInfo
+    frames: int  # PCM frames in the audio track (the embedding capacity basis)
+
+
 class CoverInfo(BaseModel):
     kind: CoverKind
     filename: str
@@ -82,6 +100,7 @@ class CoverInfo(BaseModel):
     )
     image: ImageInfo | None = None
     audio: AudioInfo | None = None
+    video: VideoInfo | None = None
 
 
 class FileRef(BaseModel):
@@ -133,7 +152,11 @@ class PayloadInfo(BaseModel):
     cover_kind: CoverKind
     n_lsb: int
     shape: list[int] = Field(
-        description="[height, width, channels] or [frames, channels]; signed so crops are detected"
+        description=(
+            "[height, width, channels] for image covers, or [frames, channels] for audio and "
+            "video covers (a video's shape describes its PCM audio track, since that is the "
+            "carrier — see stego_core/video_codec.py); signed so crops are detected"
+        )
     )
     media_hash: str = Field(description="SHA-256 of the stable representation of the cover (LSBs masked)")
     nonce: str = Field(description="hex, 16 random bytes")
