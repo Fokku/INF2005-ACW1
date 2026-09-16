@@ -23,9 +23,27 @@ Required by spec FR3: media ID, timestamp, hash, nonce and team-defined metadata
 | `encrypted` | bool | whether `message` is ciphertext |
 | `metadata` | string map | team-defined, e.g. team number, author, purpose |
 
-TODO(team): confirm this table against `stego_core/payload.py` once implemented, and record the
-canonical serialisation exactly: `json.dumps(obj, sort_keys=True, separators=(",", ":"))`, UTF-8,
-message base64-encoded. Both signer and verifier must produce identical bytes or nothing verifies.
+Confirmed against `stego_core/payload.py` (see `Payload`, `serialize`, `deserialize`). The table
+above matches the dataclass fields exactly, with one encoding detail: `message` (raw bytes) is
+carried in the JSON object under the key `message_b64`, base64-encoded, so the whole structure is
+UTF-8 JSON-safe.
+
+Canonical serialisation, byte for byte:
+
+```python
+json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+```
+
+`sort_keys=True` makes field order irrelevant; `separators=(",", ":")` removes the whitespace
+Python's default encoder would otherwise insert; `ensure_ascii=False` keeps UTF-8 metadata (e.g. a
+non-ASCII author name) as UTF-8 rather than `\uXXXX` escapes — either side would produce the same
+bytes as long as both use this exact call, but pinning it removes any ambiguity. Both signer and
+verifier must produce identical bytes from the same field values, or the Ed25519 signature will
+not verify (`signing.py`, spec FR4) — this is why `test_payload_and_signing.py` asserts
+`serialize(p) == serialize(p)` and a `serialize -> deserialize` round trip.
+
+Malformed input (bad JSON, a missing field, a corrupt base64 blob) raises `FrameError` from
+`deserialize`, which the pipeline turns into a verdict instead of crashing.
 
 ## 2. The embedded frame
 
