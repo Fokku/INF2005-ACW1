@@ -60,9 +60,9 @@ Owner: ______
 
 - [ ] `stable_media_hash` — SHA-256 over samples with the low N bits masked, plus the format fields
 - [ ] `derive_keys` — passphrase → scrypt → HKDF → `K_loc`, `K_enc`
-- [ ] `generate_keypair`, `sign`, `verify`, `fingerprint` (Ed25519, PEM files)
-- [ ] `Payload` serialize / deserialize — canonical JSON, byte-identical on both sides
-- [ ] `encrypt_message` / `decrypt_message` — AES-256-GCM for the confidential custom payload
+- [x] `generate_keypair`, `sign`, `verify`, `fingerprint` (Ed25519, PEM files) — FR4, see `tests/test_signing.py`
+- [x] `Payload` serialize / deserialize — canonical JSON, byte-identical on both sides — FR3, see `tests/test_payload.py`
+- [x] `encrypt_message` / `decrypt_message` — AES-256-GCM for the confidential custom payload
 
 Watch out: hash a stable representation, not the file bytes. `verify` returns `False` for a bad
 signature; it only raises for a bad key.
