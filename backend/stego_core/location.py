@@ -32,6 +32,12 @@ design, start-location security"). Two modes, both selectable in the GUI:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+
+from . import container, lsb
+from .errors import CapacityError
+
 MAX_COUNTER = 64  # give up after this many derivation attempts
 
 
@@ -49,23 +55,57 @@ def derive_start(
     modulus is (usable elements - elements the frame needs), and the counter is
     incremented until a candidate fits.
 
-    TODO(team): implement.
-
-    Sketch:
-      needed = ceil(frame_bits / n_lsb)
-      span   = n_elements - needed
-      if span <= 0: raise CapacityError(...)
-      for counter in range(MAX_COUNTER):
-          msg = b"start" + media_id.encode() + cover_kind.encode() + bytes([n_lsb]) + counter.to_bytes(4,"big")
-          digest = hmac.new(k_loc, msg, hashlib.sha256).digest()
-          start = int.from_bytes(digest, "big") % span
-          return start        # every candidate fits by construction of `span`
-
-    Keep the counter loop anyway: it is the hook for a future version that skips
-    regions (e.g. avoids flat areas of the image), and the design doc can
-    explain it.
+    >>> WHY `frame_bits` HERE IS NOT THE TRUE FRAME SIZE: the verifier calls
+    >>> this function BEFORE it has read anything, so it cannot know the real
+    >>> payload length — only the cover size and n_lsb. For the two sides to
+    >>> land on the same offset, `frame_bits` must be something BOTH can compute
+    >>> without reading the file: `pipeline.protect` and `pipeline.verify` both
+    >>> pass `reserved_frame_bits(n_elements, n_lsb)` (below) — a fixed fraction
+    >>> of the cover's total raw capacity, regardless of the actual message
+    >>> length. This confines the derived start to (roughly) the first 10% of
+    >>> the cover, which guarantees at least the other 90% as trailing room for
+    >>> the real frame. `pipeline.protect` still separately checks the FULL frame
+    >>> fits via `lsb.embed_bits`'s own capacity check (an unusually large
+    >>> custom payload can still legitimately exceed the reserve and raise
+    >>> CapacityError), and `pipeline.verify` learns the true payload/signature
+    >>> lengths by reading the header it finds at that offset.
     """
-    raise NotImplementedError("TODO(team): derive_start — see docstring")
+    needed = -(-frame_bits // n_lsb)  # ceil division
+    span = n_elements - needed
+    if span <= 0:
+        raise CapacityError(
+            f"cover has only {n_elements} elements, not enough room for a "
+            f"{needed}-element header at n_lsb={n_lsb}"
+        )
+
+    for counter in range(MAX_COUNTER):
+        msg = (
+            b"start"
+            + media_id.encode("utf-8")
+            + cover_kind.encode("utf-8")
+            + bytes([n_lsb])
+            + counter.to_bytes(4, "big")
+        )
+        digest = hmac.new(k_loc, msg, hashlib.sha256).digest()
+        start = int.from_bytes(digest, "big") % span
+        return start  # every candidate fits by construction of `span`
+
+    raise CapacityError(f"could not derive a start location in {MAX_COUNTER} attempts")  # pragma: no cover
+
+
+def reserved_frame_bits(n_elements: int, n_lsb: int) -> int:
+    """The `frame_bits` both `pipeline.protect` and `pipeline.verify` pass to
+    `derive_start`: 90% of the cover's total raw capacity, in bits.
+
+    A fixed fraction of a value both sides already know (cover size, n_lsb) —
+    not the true frame size, which only protect knows in advance. Confines the
+    derived start to (roughly) the first 10% of the cover, guaranteeing at
+    least the other 90% of raw capacity as trailing room for whatever frame
+    actually gets embedded — comfortable headroom for any message that also
+    passes the blanket "does it fit at all" capacity check in pipeline.protect.
+    """
+    capacity_bits = lsb.capacity_bits(n_elements, n_lsb)
+    return capacity_bits - capacity_bits // 10
 
 
 def scan_for_magic(elements, n_lsb: int, max_positions: int = 200_000) -> int | None:
@@ -79,13 +119,25 @@ def scan_for_magic(elements, n_lsb: int, max_positions: int = 200_000) -> int | 
 
     Returns the element index where MAGIC was found, or None.
 
-    TODO(team): implement.
-
-    Sketch: extract the whole LSB plane once with lsb.extract_bits(elements, 0,
-    n_elements*n_lsb, n_lsb), pack it to bytes, and search for MAGIC. Remember a
-    frame can start at any ELEMENT, so a byte-aligned search over the packed
-    stream only finds frames whose start is a multiple of 8/gcd(8, n_lsb) —
-    good enough for the demo, and a nice thing to explain as a known limitation.
-    Cap the work at `max_positions` so a 50 MB WAV cannot hang the request.
+    Extracts the LSB plane once (capped at `max_positions` elements so a 50 MB
+    WAV cannot hang the request), packs it to bytes, and searches for MAGIC.
+    A frame can start at any ELEMENT, but this byte-aligned search over the
+    packed stream only finds frames whose start is a multiple of 8/gcd(8, n_lsb)
+    elements — good enough for the demo; documented as a known limitation.
     """
-    raise NotImplementedError("TODO(team): scan_for_magic — see docstring")
+    if not 1 <= n_lsb <= 8:
+        raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
+
+    n_elements = min(len(elements), max_positions)
+    n_bits = (n_elements * n_lsb // 8) * 8  # round down to a whole number of bytes
+    if n_bits <= 0:
+        return None
+
+    bits = lsb.extract_bits(elements, 0, n_bits, n_lsb)
+    packed = lsb.bits_to_bytes(bits)
+    byte_index = packed.find(container.MAGIC)
+    if byte_index == -1:
+        return None
+
+    bit_index = byte_index * 8
+    return bit_index // n_lsb
