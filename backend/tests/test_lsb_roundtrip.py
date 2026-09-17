@@ -46,3 +46,12 @@ def test_capacity_bits() -> None:
     assert lsb.capacity_bits(1000, 8) == 8000
     with pytest.raises(ValueError):
         lsb.capacity_bits(1000, 9)
+
+
+def test_bits_to_bytes_rejects_non_byte_aligned_length() -> None:
+    """np.packbits silently zero-pads a short length instead of raising —
+    bits_to_bytes must not inherit that footgun, since a caller mistake here
+    would otherwise surface as a mysterious hash/signature mismatch far from
+    its actual cause instead of failing immediately and clearly."""
+    with pytest.raises(ValueError):
+        lsb.bits_to_bytes(np.array([1, 0, 1, 0, 1], dtype=np.uint8))

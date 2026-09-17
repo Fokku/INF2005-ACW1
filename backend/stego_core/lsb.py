@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .errors import CapacityError  # noqa: F401  (raised once embed_bits is implemented)
+from .errors import CapacityError
 
 
 def capacity_bits(n_elements: int, n_lsb: int) -> int:
@@ -44,7 +44,17 @@ def bytes_to_bits(data: bytes) -> np.ndarray:
 
 
 def bits_to_bytes(bits: np.ndarray) -> bytes:
-    """Inverse of `bytes_to_bits`. `bits` length must be a multiple of 8."""
+    """Inverse of `bytes_to_bits`. `bits` length must be a multiple of 8.
+
+    Enforced, not just documented: np.packbits silently zero-pads a short
+    length to the next byte instead of raising, which would otherwise turn
+    an off-by-a-few-bits caller mistake into a plausible-looking but WRONG
+    byte string — the worst kind of bug in a module a signature is computed
+    over, since it fails downstream (hash/signature mismatch) far from its
+    actual cause instead of failing here, immediately and clearly.
+    """
+    if len(bits) % 8 != 0:
+        raise ValueError(f"bits length must be a multiple of 8, got {len(bits)}")
     return np.packbits(bits).tobytes()
 
 
