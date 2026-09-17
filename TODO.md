@@ -30,14 +30,15 @@ I (admin) can start immediately and run alongside everything.
 
 ## A · Bit engine — `backend/stego_core/lsb.py`
 
-Owner: ______
+Owner: Zong Han (done)
 
 Everything else depends on this. Do it first.
 
-- [ ] `bytes_to_bits` and `bits_to_bytes`
-- [ ] `embed_bits` — replace the low N bits of consecutive elements, starting at an offset
-- [ ] `extract_bits` — the exact inverse
-- [ ] Make `tests/test_lsb_roundtrip.py` pass for every LSB count 1–8 (remove the `pytest.skip` lines)
+- [x] `bytes_to_bits` and `bits_to_bytes`
+- [x] `embed_bits` — replace the low N bits of consecutive elements, starting at an offset
+- [x] `extract_bits` — the exact inverse
+- [x] Make `tests/test_lsb_roundtrip.py` pass for every LSB count 1–8 (remove the `pytest.skip` lines)
+      — 25/25 green, verified end-to-end through both `image_codec` (PNG) and `audio_codec` (WAV).
 
 Watch out: keep the array dtype, and never do bit operations on `int16`.
 
