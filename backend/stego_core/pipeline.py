@@ -10,9 +10,16 @@ after the pieces have tests.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
-from .verdict import Verdict
+from . import audio_codec, container, hashing, image_codec, kdf, location, lsb, signing, video_codec
+from . import payload as payload_mod
+from .errors import CapacityError, FrameError, KeyError_, StegoError, UnsupportedCoverError
+from .verdict import ExtractionOutcome, Verdict, decide
 
 
 @dataclass
@@ -40,10 +47,57 @@ class ProtectOutcome:
     signature: bytes
 
 
+def _load_cover(cover_kind: str, cover_bytes: bytes):
+    """Decode any of the three cover kinds into (cover, header_fields, shape).
+
+    `header_fields` and `shape` are built the SAME way in protect and verify —
+    that consistency is what makes the stable hash and the signed shape
+    reproducible on both sides.
+    """
+    if cover_kind == "image":
+        cover = image_codec.load_png(cover_bytes)
+        header_fields = {
+            "kind": "image",
+            "height": cover.height,
+            "width": cover.width,
+            "channels": cover.channels,
+        }
+        shape = [cover.height, cover.width, cover.channels]
+    elif cover_kind == "audio":
+        cover = audio_codec.load_wav(cover_bytes)
+        header_fields = {
+            "kind": "audio",
+            "rate": cover.sample_rate,
+            "channels": cover.channels,
+            "width": cover.sample_width,
+        }
+        shape = [cover.frames, cover.channels]
+    elif cover_kind == "video":
+        cover = video_codec.load_avi(cover_bytes)
+        header_fields = {
+            "kind": "video",
+            "rate": cover.sample_rate,
+            "channels": cover.channels,
+            "width": cover.sample_width,
+        }
+        shape = [cover.frames, cover.channels]
+    else:
+        raise UnsupportedCoverError(f"unknown cover kind: {cover_kind!r}")
+    return cover, header_fields, shape
+
+
+def _save_cover(cover_kind: str, cover, elements) -> bytes:
+    if cover_kind == "image":
+        return image_codec.save_png(cover, elements)
+    if cover_kind == "audio":
+        return audio_codec.save_wav(cover, elements)
+    if cover_kind == "video":
+        return video_codec.save_avi(cover, elements)
+    raise UnsupportedCoverError(f"unknown cover kind: {cover_kind!r}")
+
+
 def protect(opts: ProtectOptions) -> ProtectOutcome:
     """Embed a signed verification payload into a cover object.
-
-    TODO(team): implement.
 
     Order of operations (each step is one call into another module):
       1. Decode the cover           image_codec.load_png / audio_codec.load_wav /
@@ -67,7 +121,87 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
     Step 2 must run on the ORIGINAL cover, and the same masked-hash formula must
     reproduce on the stego file — that is the whole point of the stable hash.
     """
-    raise NotImplementedError("TODO(team): protect — see docstring")
+    cover, header_fields, shape = _load_cover(opts.cover_kind, opts.cover_bytes)
+    elements = cover.elements
+    n_elements = len(elements)
+
+    media_hash = hashing.stable_media_hash(elements, opts.n_lsb, header_fields)
+
+    derived = None
+    if opts.passphrase:
+        salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
+        derived = kdf.derive_keys(opts.passphrase, salt)
+
+    message_bytes = opts.message
+    encrypted = False
+    if opts.encrypt_message:
+        if derived is None:
+            raise StegoError("a passphrase is required to encrypt the message")
+        message_bytes = payload_mod.encrypt_message(
+            derived.k_enc, message_bytes, aad=opts.media_id.encode("utf-8")
+        )
+        encrypted = True
+
+    pl = payload_mod.Payload(
+        media_id=opts.media_id,
+        timestamp=datetime.now(UTC).isoformat(),
+        media_hash=media_hash,
+        nonce=payload_mod.new_nonce(),
+        cover_kind=opts.cover_kind,
+        n_lsb=opts.n_lsb,
+        shape=shape,
+        message_mime=opts.message_mime,
+        message=message_bytes,
+        encrypted=encrypted,
+        metadata=opts.metadata,
+    )
+    payload_bytes = payload_mod.serialize(pl)
+    signature = signing.sign(opts.private_key_pem, payload_bytes)
+    frame = container.build_frame(payload_bytes, signature, opts.n_lsb, encrypted)
+
+    # Required demo case (spec Section 5): a blanket "does this even fit
+    # anywhere" check, with a message that names the shortfall directly,
+    # rather than letting a cryptic CapacityError surface from deep inside
+    # embed_bits for the common "message is too big" mistake.
+    total_capacity_bits = lsb.capacity_bits(n_elements, opts.n_lsb)
+    if len(frame) * 8 > total_capacity_bits:
+        raise CapacityError(
+            f"payload does not fit: the frame needs {len(frame)} bytes "
+            f"({len(frame) * 8} bits) at n_lsb={opts.n_lsb}, but this cover only "
+            f"has capacity for {total_capacity_bits // 8} bytes"
+        )
+
+    if opts.explicit_start is not None:
+        start = opts.explicit_start
+        if start < 0:
+            raise ValueError(f"explicit_start must be >= 0, got {start}")
+    else:
+        if derived is None:
+            raise StegoError("a passphrase is required for derived start-location mode")
+        # Anchor the derivation to a fixed fraction of raw capacity (see
+        # location.reserved_frame_bits) so the verifier — which does not yet
+        # know the true frame size — lands on the exact same offset.
+        start = location.derive_start(
+            derived.k_loc,
+            opts.media_id,
+            opts.cover_kind,
+            opts.n_lsb,
+            n_elements,
+            location.reserved_frame_bits(n_elements, opts.n_lsb),
+        )
+
+    bits = lsb.bytes_to_bits(frame)
+    new_elements = lsb.embed_bits(elements, bits, start, opts.n_lsb)
+    stego_bytes = _save_cover(opts.cover_kind, cover, new_elements)
+
+    return ProtectOutcome(
+        stego_bytes=stego_bytes,
+        start_offset=start,
+        frame_bytes=len(frame),
+        capacity_bytes=total_capacity_bits // 8,
+        payload_json=json.loads(payload_bytes),
+        signature=signature,
+    )
 
 
 @dataclass
@@ -89,12 +223,24 @@ class VerifyOutcome:
     media_hash_embedded: str | None
     media_hash_recomputed: str | None
     start_offset_used: int | None
+    signature_valid: bool | None = None
+
+
+def _give_up(outcome: ExtractionOutcome, start: int | None) -> VerifyOutcome:
+    verdict, reasons = decide(outcome)
+    return VerifyOutcome(
+        verdict=verdict,
+        reasons=reasons,
+        payload_json=None,
+        media_hash_embedded=None,
+        media_hash_recomputed=None,
+        start_offset_used=start,
+        signature_valid=outcome.signature_valid,
+    )
 
 
 def verify(opts: VerifyOptions) -> VerifyOutcome:
     """Extract, check and judge. Never raises for a bad file — returns a verdict.
-
-    TODO(team): implement.
 
     Order of operations:
       1. Decode the stego object. UnsupportedCoverError -> CANNOT_VERIFY.
@@ -114,4 +260,141 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
     Wrap each stage so an unexpected exception becomes CANNOT_VERIFY with the
     error in `reasons` — a crash during the live demo is worse than a verdict.
     """
-    raise NotImplementedError("TODO(team): verify — see docstring")
+    outcome = ExtractionOutcome()
+    try:
+        try:
+            cover, header_fields, actual_shape = _load_cover(opts.cover_kind, opts.stego_bytes)
+        except UnsupportedCoverError as exc:
+            outcome.cover_supported = False
+            outcome.error = str(exc)
+            return _give_up(outcome, None)
+
+        elements = cover.elements
+        n_elements = len(elements)
+
+        # --- 2. Resolve the start -------------------------------------------------
+        start: int | None
+        if opts.explicit_start is not None:
+            start = opts.explicit_start
+        elif opts.passphrase:
+            salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
+            derived = kdf.derive_keys(opts.passphrase, salt)
+            try:
+                start = location.derive_start(
+                    derived.k_loc,
+                    opts.media_id,
+                    opts.cover_kind,
+                    opts.n_lsb,
+                    n_elements,
+                    location.reserved_frame_bits(n_elements, opts.n_lsb),
+                )
+            except CapacityError as exc:
+                outcome.error = str(exc)
+                return _give_up(outcome, None)
+        else:
+            outcome.error = "no passphrase or explicit start offset was supplied"
+            return _give_up(outcome, None)
+
+        # --- 3. Read the header at that start --------------------------------------
+        header_needed = -(-container.HEADER_SIZE * 8 // opts.n_lsb)
+        payload_len = sig_len = frame_n_lsb = None
+        if 0 <= start and start + header_needed <= n_elements:
+            try:
+                header_bits = lsb.extract_bits(elements, start, container.HEADER_SIZE * 8, opts.n_lsb)
+                header_bytes = lsb.bits_to_bytes(header_bits)
+                payload_len, sig_len, frame_n_lsb, _frame_encrypted = container.parse_header(header_bytes)
+                outcome.magic_at_expected_start = True
+            except (FrameError, CapacityError):
+                outcome.magic_at_expected_start = False
+        else:
+            outcome.magic_at_expected_start = False
+
+        if not outcome.magic_at_expected_start:
+            found = location.scan_for_magic(elements, opts.n_lsb)
+            outcome.magic_found_elsewhere = found is not None
+            return _give_up(outcome, start)
+
+        # --- 4. Read the rest of the frame ------------------------------------------
+        frame_bits_total = container.frame_size_bits(payload_len, sig_len)
+        frame_needed = -(-frame_bits_total // opts.n_lsb)
+        try:
+            if start + frame_needed > n_elements:
+                raise FrameError("frame extends past the end of the cover")
+            frame_bit_array = lsb.extract_bits(elements, start, frame_bits_total, opts.n_lsb)
+            frame_bytes_full = lsb.bits_to_bytes(frame_bit_array)
+            payload_bytes, signature, _frame_n_lsb2, _frame_encrypted2 = container.parse_frame(
+                frame_bytes_full
+            )
+            outcome.frame_parsed = True
+            outcome.crc_ok = True
+        except (FrameError, CapacityError) as exc:
+            outcome.frame_parsed = False
+            outcome.crc_ok = False
+            outcome.error = str(exc)
+            return _give_up(outcome, start)
+
+        # --- Deserialize the payload -------------------------------------------------
+        try:
+            pl = payload_mod.deserialize(payload_bytes)
+            outcome.payload_parsed = True
+        except FrameError as exc:
+            outcome.payload_parsed = False
+            outcome.error = str(exc)
+            return _give_up(outcome, start)
+
+        # --- 5. Signature ------------------------------------------------------------
+        try:
+            outcome.signature_valid = signing.verify(opts.public_key_pem, payload_bytes, signature)
+        except KeyError_ as exc:
+            outcome.public_key_usable = False
+            outcome.error = str(exc)
+            return _give_up(outcome, start)
+
+        if not outcome.signature_valid:
+            return _give_up(outcome, start)
+
+        # --- 6. Recompute the media hash, using the SIGNED n_lsb but the ACTUAL
+        # cover's own header fields (that's what "stable" means: reproducible
+        # from the file itself, not taken on faith from the payload) ----------------
+        media_hash_recomputed = hashing.stable_media_hash(elements, pl.n_lsb, header_fields)
+        outcome.hash_match = media_hash_recomputed == pl.media_hash
+
+        # --- 7. Cross-check frame/actual parameters against the signed payload -------
+        # (the SIGNED shape vs the cover's ACTUAL shape is what catches a crop)
+        outcome.params_match = (
+            frame_n_lsb == pl.n_lsb
+            and opts.cover_kind == pl.cover_kind
+            and opts.media_id == pl.media_id
+            and actual_shape == pl.shape
+        )
+
+        # --- Best-effort decrypt, for display only — never affects the verdict -------
+        payload_json = json.loads(payload_bytes)
+        if pl.encrypted and opts.passphrase:
+            try:
+                salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
+                derived = kdf.derive_keys(opts.passphrase, salt)
+                plaintext = payload_mod.decrypt_message(
+                    derived.k_enc, pl.message, aad=opts.media_id.encode("utf-8")
+                )
+                payload_json["message_b64"] = base64.b64encode(plaintext).decode("ascii")
+            except FrameError:
+                pass  # wrong passphrase for decryption alone does not change the verdict
+
+        verdict, reasons = decide(outcome)
+        return VerifyOutcome(
+            verdict=verdict,
+            reasons=reasons,
+            payload_json=payload_json,
+            media_hash_embedded=pl.media_hash,
+            media_hash_recomputed=media_hash_recomputed,
+            start_offset_used=start,
+            signature_valid=outcome.signature_valid,
+        )
+    except StegoError as exc:
+        outcome.error = str(exc)
+        return _give_up(outcome, None)
+    except Exception as exc:  # noqa: BLE001 - a crash during the live demo is worse than a verdict
+        outcome.cover_supported = False
+        outcome.error = f"unexpected error: {exc}"
+        return _give_up(outcome, None)
