@@ -6,11 +6,25 @@ FR8, FR9, FR10.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, UploadFile
+import base64
 
-from ..schemas import StartMode, VerifyReport
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from stego_core import hashing, pipeline
+from stego_core.errors import UnsupportedCoverError
+
+from .. import storage
+from ..schemas import CoverInfo, CoverKind, FileRef, PayloadInfo, StartMode, VerifyReport
+from .capacity import _cover_info, _decode_cover, _sniff_kind
 
 router = APIRouter()
+
+_EXT_BY_MIME = {
+    "text/plain": ".txt",
+    "image/png": ".png",
+    "audio/wav": ".wav",
+    "application/json": ".json",
+}
 
 
 @router.post("/verify", response_model=VerifyReport)
@@ -26,19 +40,111 @@ async def verify(
 ) -> VerifyReport:
     """Judge a file and explain the judgement.
 
-    TODO(team): implement.
-
-    Steps:
-      1. Read the uploads; take the key from the file or the pasted text.
-      2. Build pipeline.VerifyOptions and call pipeline.verify().
-      3. If a message came back, storage.save() it so the GUI can display or
-         PLAY it — the spec requires the GUI to be able to play/execute the
-         payload, and that is what PayloadPreview does with the file URL.
-      4. Fill in VerifyReport: verdict, reasons, both hashes, hash_match,
-         signature_valid, start_offset_used and the decoded payload.
-
     This endpoint must NOT raise for a bad file. A missing payload, a wrong key
     and a corrupted frame are all normal outcomes with their own verdict. Only
     a genuinely broken request (no file at all) is an HTTP error.
     """
-    raise NotImplementedError("TODO(team): app/routers/verify.py::verify")
+    stego_bytes = await stego.read()
+
+    try:
+        kind = _sniff_kind(stego.filename or "")
+    except UnsupportedCoverError as exc:
+        fallback = CoverInfo(
+            kind=CoverKind.image,
+            filename=stego.filename or "stego",
+            size_bytes=len(stego_bytes),
+            sha256=hashing.sha256_hex(stego_bytes),
+        )
+        return VerifyReport(
+            verdict="Cannot Verify",
+            reasons=[str(exc)],
+            stego=fallback,
+            n_lsb=n_lsb,
+            start_mode=start_mode,
+            payload_found=False,
+        )
+
+    if public_key_pem is not None:
+        public_key_bytes = await public_key_pem.read()
+    elif public_key_text is not None:
+        public_key_bytes = public_key_text.encode("utf-8")
+    else:
+        raise HTTPException(status_code=400, detail="a public key (file or pasted text) is required")
+
+    opts = pipeline.VerifyOptions(
+        stego_bytes=stego_bytes,
+        cover_kind=kind.value,
+        public_key_pem=public_key_bytes,
+        n_lsb=n_lsb,
+        media_id=media_id,
+        passphrase=passphrase or None,
+        explicit_start=explicit_start if start_mode == StartMode.explicit else None,
+    )
+    outcome = pipeline.verify(opts)
+
+    try:
+        decoded = _decode_cover(kind, stego_bytes)
+        cover_info = _cover_info(kind, stego.filename or "stego", stego_bytes, decoded)
+    except UnsupportedCoverError:
+        cover_info = CoverInfo(
+            kind=kind,
+            filename=stego.filename or "stego",
+            size_bytes=len(stego_bytes),
+            sha256=hashing.sha256_hex(stego_bytes),
+        )
+
+    payload_info = None
+    if outcome.payload_json is not None:
+        pd = outcome.payload_json
+        message_bytes = base64.b64decode(pd["message_b64"])
+        message_text = None
+        message_file = None
+        if pd["message_mime"].startswith("text/") and not pd["encrypted"]:
+            try:
+                message_text = message_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                message_text = None
+        if message_text is None:
+            # Either a non-text MIME, or an encrypted message pipeline.verify
+            # could not decrypt (no/wrong passphrase) — offer it as a file
+            # either way; pd["encrypted"] still truthfully records whether it
+            # WAS sent encrypted, separately from whether we could read it.
+            ext = _EXT_BY_MIME.get(pd["message_mime"], ".bin")
+            message_file = FileRef(**storage.save(message_bytes, f"message{ext}"))
+
+        payload_info = PayloadInfo(
+            version=pd["version"],
+            media_id=pd["media_id"],
+            timestamp=pd["timestamp"],
+            cover_kind=kind,
+            n_lsb=pd["n_lsb"],
+            shape=pd["shape"],
+            media_hash=pd["media_hash"],
+            nonce=pd["nonce"],
+            metadata=pd["metadata"],
+            message_mime=pd["message_mime"],
+            message_encrypted=pd["encrypted"],
+            message_text=message_text,
+            message_file=message_file,
+        )
+
+    hash_match = None
+    if outcome.media_hash_embedded is not None and outcome.media_hash_recomputed is not None:
+        hash_match = outcome.media_hash_embedded == outcome.media_hash_recomputed
+
+    payload_found = outcome.verdict.value not in ("Payload Missing", "Cannot Verify")
+
+    return VerifyReport(
+        verdict=outcome.verdict,
+        reasons=outcome.reasons,
+        stego=cover_info,
+        n_lsb=n_lsb,
+        start_mode=start_mode,
+        start_offset_used=outcome.start_offset_used,
+        payload_found=payload_found,
+        signature_valid=outcome.signature_valid,
+        media_hash_embedded=outcome.media_hash_embedded,
+        media_hash_recomputed=outcome.media_hash_recomputed,
+        hash_match=hash_match,
+        payload=payload_info,
+    )

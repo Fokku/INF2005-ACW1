@@ -6,11 +6,20 @@ FR3, FR4, FR5, FR6, FR7.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, UploadFile
+import base64
+import json
 
-from ..schemas import ProtectResult, StartMode
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from stego_core import image_codec, pipeline
+
+from .. import storage
+from ..schemas import CoverKind, FileRef, PayloadInfo, ProtectResult, StartMode
+from .capacity import _cover_info, _decode_cover, _sniff_kind
 
 router = APIRouter()
+
+_SUFFIX = {CoverKind.image: ".png", CoverKind.audio: ".wav", CoverKind.video: ".avi"}
 
 
 @router.post("/protect", response_model=ProtectResult)
@@ -30,27 +39,80 @@ async def protect(
 ) -> ProtectResult:
     """Embed and sign, then return the stego file plus everything the demo needs
     to explain what happened.
-
-    TODO(team): implement.
-
-    Steps:
-      1. Read the uploads; take the message from `message` or `message_text`.
-      2. Sniff the cover kind (.png -> image, .wav -> audio, .avi -> video).
-      3. Build pipeline.ProtectOptions from these fields and call pipeline.protect().
-      4. storage.save() the stego bytes with a sensible filename
-         (e.g. "lena.stego.png") so the download in the A-to-B demo is readable.
-      5. For image covers, also save image_codec.lsb_plane_png() as `diff` —
-         it makes the side-by-side comparison convincing. There is no video-side
-         equivalent: the payload lives in the audio track, not the frames, so an
-         `AudioCompare`-style before/after listen is the right comparison, not a
-         visual diff.
-      6. Fill in ProtectResult, including start_offset, frame_bytes,
-         capacity_bytes and the decoded payload.
-
-    Return the start_offset even in derived mode: the demo has to SHOW that the
-    location was chosen by the key rather than fixed at the top-left corner
-    (learning outcome 6).
-
-    A CapacityError from the core already becomes a clean HTTP 400 via main.py.
     """
-    raise NotImplementedError("TODO(team): app/routers/protect.py::protect")
+    cover_bytes = await cover.read()
+    kind = _sniff_kind(cover.filename or "")
+
+    if message is not None:
+        message_bytes = await message.read()
+    elif message_text is not None:
+        message_bytes = message_text.encode("utf-8")
+    else:
+        raise HTTPException(status_code=400, detail="either `message` or `message_text` is required")
+
+    if private_key_pem is None:
+        raise HTTPException(status_code=400, detail="a private key PEM is required to sign the payload")
+    private_key_bytes = await private_key_pem.read()
+
+    try:
+        metadata = json.loads(metadata_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"metadata_json is not valid JSON: {exc}") from exc
+
+    opts = pipeline.ProtectOptions(
+        cover_bytes=cover_bytes,
+        cover_kind=kind.value,
+        message=message_bytes,
+        message_mime=message_mime,
+        n_lsb=n_lsb,
+        media_id=media_id,
+        metadata=metadata,
+        private_key_pem=private_key_bytes,
+        passphrase=passphrase or None,
+        explicit_start=explicit_start if start_mode == StartMode.explicit else None,
+        encrypt_message=encrypt_message,
+    )
+    outcome = pipeline.protect(opts)
+
+    base_name = (cover.filename or "cover").rsplit(".", 1)[0]
+    stego_ref = FileRef(**storage.save(outcome.stego_bytes, f"{base_name}.stego{_SUFFIX[kind]}"))
+
+    diff_ref = None
+    if kind == CoverKind.image:
+        # A round-trip re-decode of the stego bytes, purely to render the
+        # amplified LSB-plane comparison image for the GUI.
+        stego_cover = image_codec.load_png(outcome.stego_bytes)
+        diff_bytes = image_codec.lsb_plane_png(stego_cover, stego_cover.elements, n_lsb)
+        diff_ref = FileRef(**storage.save(diff_bytes, f"{base_name}.diff.png"))
+
+    cover_decoded = _decode_cover(kind, cover_bytes)
+    cover_info = _cover_info(kind, cover.filename or "cover", cover_bytes, cover_decoded)
+
+    pd = outcome.payload_json
+    payload_info = PayloadInfo(
+        version=pd["version"],
+        media_id=pd["media_id"],
+        timestamp=pd["timestamp"],
+        cover_kind=kind,
+        n_lsb=pd["n_lsb"],
+        shape=pd["shape"],
+        media_hash=pd["media_hash"],
+        nonce=pd["nonce"],
+        metadata=pd["metadata"],
+        message_mime=pd["message_mime"],
+        message_encrypted=pd["encrypted"],
+        message_text=message_text if (not encrypt_message and message_mime.startswith("text/")) else None,
+    )
+
+    return ProtectResult(
+        stego=stego_ref,
+        cover=cover_info,
+        n_lsb=n_lsb,
+        start_mode=start_mode,
+        start_offset=outcome.start_offset,
+        payload=payload_info,
+        signature_b64=base64.b64encode(outcome.signature).decode("ascii"),
+        frame_bytes=outcome.frame_bytes,
+        capacity_bytes=outcome.capacity_bytes,
+        diff=diff_ref,
+    )
