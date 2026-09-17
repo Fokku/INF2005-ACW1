@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 import numpy as np
 
@@ -38,18 +39,20 @@ def stable_media_hash(elements: np.ndarray, n_lsb: int, header_fields: dict[str,
                        {"kind": "image", "height": 512, "width": 512, "channels": 3}
                        or {"kind": "audio", "rate": 44100, "channels": 2, "width": 2}.
 
-    TODO(team): implement.
-
-    Sketch:
-      1. masked = elements & ~((1 << n_lsb) - 1)     # same dtype trick as lsb.py
-      2. h = hashlib.sha256()
-      3. h.update(canonical bytes of header_fields)  # sorted keys, utf-8, a
-         separator you document — this is what makes a crop detectable
-      4. h.update(masked.tobytes())
-      5. return h.hexdigest()
-
-    Write the exact formula in docs/design/payload-format.md. The verifier
-    recomputes it with the SAME n_lsb (which is read from the frame header), so
-    both sides must agree bit for bit.
+    Formula (see docs/design/payload-format.md):
+        SHA-256( canonical_json(header_fields) || masked_elements_bytes )
+    where masked_elements = elements & ~((1 << n_lsb) - 1), in the array's own
+    dtype, and canonical_json uses sorted keys and no whitespace so both sides
+    produce byte-identical input.
     """
-    raise NotImplementedError("TODO(team): stable_media_hash — see docstring")
+    if not 1 <= n_lsb <= 8:
+        raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
+
+    bit_width = elements.dtype.itemsize * 8
+    clear_mask = np.array(~((1 << n_lsb) - 1) & ((1 << bit_width) - 1), dtype=elements.dtype)
+    masked = elements & clear_mask
+
+    h = hashlib.sha256()
+    h.update(json.dumps(header_fields, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    h.update(masked.tobytes())
+    return h.hexdigest()

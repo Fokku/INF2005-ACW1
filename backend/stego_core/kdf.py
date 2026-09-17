@@ -13,9 +13,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# from cryptography.hazmat.primitives import hashes
-# from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
-# from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 SCRYPT_N = 2**15
 SCRYPT_R = 8
@@ -38,15 +38,12 @@ def derive_keys(passphrase: str, salt: bytes) -> DerivedKeys:
               Do NOT use a random salt you only store inside the payload — the
               verifier needs the keys before it can read the payload. (Circular.)
 
-    TODO(team): implement.
-
-    Sketch:
-      master = Scrypt(salt=salt, length=32, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P)
-                   .derive(passphrase.encode())
-      k_loc  = HKDFExpand(algorithm=SHA256(), length=32, info=b"acw1-loc").derive(master)
-      k_enc  = HKDFExpand(algorithm=SHA256(), length=32, info=b"acw1-enc").derive(master)
-
     Note the cost: scrypt at n=2**15 takes ~100 ms. That is intentional (it
     slows passphrase guessing) but call it once per request, not per bit.
     """
-    raise NotImplementedError("TODO(team): derive_keys — see docstring")
+    master = Scrypt(salt=salt, length=32, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P).derive(
+        passphrase.encode("utf-8")
+    )
+    k_loc = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b"acw1-loc").derive(master)
+    k_enc = HKDFExpand(algorithm=hashes.SHA256(), length=32, info=b"acw1-enc").derive(master)
+    return DerivedKeys(k_loc=k_loc, k_enc=k_enc)
