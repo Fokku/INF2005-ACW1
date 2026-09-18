@@ -57,10 +57,10 @@ Watch out: 16-bit WAV needs a `uint16` view. Never write JPEG.
 
 ## C · Crypto — `hashing.py`, `kdf.py`, `signing.py`, `payload.py`
 
-Owner: ______
+Owner: Zong Han (done)
 
-- [ ] `stable_media_hash` — SHA-256 over samples with the low N bits masked, plus the format fields
-- [ ] `derive_keys` — passphrase → scrypt → HKDF → `K_loc`, `K_enc`
+- [x] `stable_media_hash` — SHA-256 over samples with the low N bits masked, plus the format fields
+- [x] `derive_keys` — passphrase → scrypt → HKDF → `K_loc`, `K_enc`
 - [x] `generate_keypair`, `sign`, `verify`, `fingerprint` (Ed25519, PEM files) — FR4, see `tests/test_signing.py`
 - [x] `Payload` serialize / deserialize — canonical JSON, byte-identical on both sides — FR3, see `tests/test_payload.py`
 - [x] `encrypt_message` / `decrypt_message` — AES-256-GCM for the confidential custom payload
@@ -70,32 +70,42 @@ signature; it only raises for a bad key.
 
 ## D · Frame, start location, verdicts — `container.py`, `location.py`, `verdict.py`
 
-Owner: ______
+Owner: Zong Han (done)
 
 This workstream is where most of rubric criterion 1 lives.
 
-- [ ] `build_frame` / `parse_frame` / `parse_header` — magic, version, lengths, CRC32
-- [ ] `derive_start` — keyed HMAC start offset that the verifier can re-derive
-- [ ] `scan_for_magic` — bounded search that separates *Wrong Start Location* from *Payload Missing*
-- [ ] `decide` — the verdict decision table, one branch per category
-- [ ] Make `tests/test_verdicts.py` pass, all six verdicts
+- [x] `build_frame` / `parse_frame` / `parse_header` — magic, version, lengths, CRC32
+- [x] `derive_start` — keyed HMAC start offset that the verifier can re-derive
+- [x] `scan_for_magic` — bounded search that separates *Wrong Start Location* from *Payload Missing*
+- [x] `decide` — the verdict decision table, one branch per category
+- [x] Make `tests/test_verdicts.py` pass, all six verdicts — 12/12 green (one per verdict per cover type)
 
 Watch out: never derive the start from the media hash, the payload nonce, or the cover shape.
-The module docstring explains why each one breaks a verdict.
+The module docstring explains why each one breaks a verdict. Note a related subtlety worth writing
+into `docs/design/start-location.md`: `derive_start`'s modulus (`span = n_elements - needed`) is
+still indirectly shape-sensitive even though shape itself isn't hashed into the HMAC message —
+cropping a derived-mode file shifts `n_elements`, hence the offset, same failure story as deriving
+from shape directly.
 
 ## E · End-to-end pipeline and API — `pipeline.py`, `app/routers/*`, `cli.py`
 
-Owner: ______
+Owner: Zong Han (pipeline + capacity/protect/verify routers done; attack router and CLI still open)
 
 Do this after A–D. It is mostly plumbing.
 
-- [ ] `pipeline.protect` — hash, build payload, sign, frame, capacity check, choose start, embed
-- [ ] `pipeline.verify` — resolve start, parse, check signature, recompute hash, decide
-- [ ] Fill in the four router stubs: `capacity`, `protect`, `verify`, `attack`
+- [x] `pipeline.protect` — hash, build payload, sign, frame, capacity check, choose start, embed
+      (image, audio, and video covers)
+- [x] `pipeline.verify` — resolve start, parse, check signature, recompute hash, decide
+      (image, audio, and video covers)
+- [x] `capacity`, `protect`, `verify`, `keys` routers wired to the real pipeline/`signing` functions
+- [ ] `attack` router / `attacks.py` — still stubbed, see workstream F
 - [ ] Fill in the `stego` CLI commands: `keygen`, `capacity`, `protect`, `verify`, `tamper`
-- [ ] Make `tests/test_api.py::test_protect_then_verify_roundtrip` pass for image and audio
+      (`stego_core/cli.py` — every command still `raise NotImplementedError`)
+- [x] Make `tests/test_api.py::test_protect_then_verify_roundtrip` pass for image and audio
 
-The frontend needs no changes — it already calls all of these correctly.
+The frontend needs no changes — it already calls all of these correctly. Full backend suite is
+78/78 green (`cd backend && pytest -q`); the only thing left producing a `501 not_implemented` at
+the API level is `/api/attack`.
 
 ## F · Attack lab and innovation — `attacks.py`
 
@@ -181,9 +191,8 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
       container), `CoverKind.video` / `VideoInfo` in `schemas.py`, `.avi` MIME in `storage.py`, and
       the Protect/Verify/Attack Lab pages + `VideoCompare.tsx` all done; `tests/test_video_codec.py`
       is green (5/5).
-  - [ ] Wire it through `pipeline.protect` / `pipeline.verify` once those are implemented
-        (workstream E) — the docstrings mention `video_codec` but the pipeline body itself still
-        raises `NotImplementedError`.
+  - [x] Wired through `pipeline.protect` / `pipeline.verify` (workstream E) — `cover_kind == "video"`
+        is handled alongside image/audio in both directions.
 - [ ] **Robust embedding** — improve payload survival under compression, noise, resampling or
       mild transformation, using redundancy, error correction (e.g. repetition or Hamming codes)
       or spread-spectrum techniques. Document the trade-off against raw capacity.

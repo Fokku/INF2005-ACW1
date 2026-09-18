@@ -3,9 +3,11 @@
 INF2005 ACW1 team project (Singapore Institute of Technology, Trimester 1 2026).
 A GUI-based **LSB-replacement steganography** tool that protects a PNG image and a WAV audio file by embedding a **signed verification payload** inside them, and later verifies whether a file is authentic using **hashing** and **digital-signature** checks.
 
-> **Status: scaffolded.** The web UI, the API and the module structure are in place and run today.
-> The steganography and cryptography functions are stubs marked `TODO(team)` — every feature
-> endpoint currently answers with a message naming the function that still has to be written.
+> **Status: core pipeline working.** The web UI, the API, and the full protect → verify round trip
+> (LSB embed/extract, hashing, Ed25519 signing, start-location derivation, all six verdicts) work
+> end to end for image, audio, and video covers — 78/78 backend tests green. What's left is the
+> Attack Lab backend (`stego_core/attacks.py`, `/api/attack` still answers `501`), the `stego` CLI
+> commands, `docs/design/` (still empty), and `scripts/make_samples.py` / `evidence/`.
 > See [TODO.md](TODO.md) for the nine workstreams and [TECH_STACK.md](TECH_STACK.md) for the stack.
 >
 > Find your work with: `grep -rn "TODO(team)" backend frontend scripts`
