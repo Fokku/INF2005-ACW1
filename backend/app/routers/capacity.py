@@ -14,11 +14,23 @@ from ..schemas import AudioInfo, CapacityReport, CoverInfo, CoverKind, ImageInfo
 
 router = APIRouter()
 
-# A rough allowance for the JSON payload fields around the message itself
+# A rough allowance for the JSON payload fields OTHER than the message itself
 # (media_id, timestamp, media_hash, nonce, cover_kind, n_lsb, shape,
-# message_mime, encrypted, metadata, base64 overhead...). Documented here
-# rather than computed exactly, since the metadata size is user-chosen.
+# message_mime, encrypted, metadata). Documented here rather than computed
+# exactly, since the metadata size is user-chosen.
 PAYLOAD_JSON_OVERHEAD_BYTES = 300
+
+
+def _base64_len(raw_bytes: int) -> int:
+    """Bytes needed to base64-encode `raw_bytes` of input (with padding).
+
+    payload.serialize() puts the message into the signed JSON as
+    `message_b64`, which is base64, not raw -- that inflates it by ~4/3. For
+    a short message this rounds to noise; for a large custom message
+    (hundreds of KB) it is the dominant term, so it must be accounted for
+    explicitly rather than folded into a flat overhead constant.
+    """
+    return ((raw_bytes + 2) // 3) * 4
 
 
 def _sniff_kind(filename: str) -> CoverKind:
@@ -83,12 +95,22 @@ async def check_capacity(
     capacity_bits = lsb.capacity_bits(total_elements, n_lsb)
     capacity_bytes = capacity_bits // 8
 
-    overhead = container.frame_size_bytes(0, signing.SIGNATURE_BYTES) + PAYLOAD_JSON_OVERHEAD_BYTES
-    max_message_bytes = max(0, capacity_bytes - overhead)
+    fixed_frame_bytes = container.frame_size_bytes(0, signing.SIGNATURE_BYTES) + PAYLOAD_JSON_OVERHEAD_BYTES
 
+    # "Largest message" is a standalone figure independent of what's currently
+    # typed: invert the base64 ratio (raw = 3/4 of its encoded size) rather
+    # than treating the message as going in byte-for-byte.
+    max_message_bytes = max(0, ((capacity_bytes - fixed_frame_bytes) * 3) // 4)
+
+    frame_overhead_bytes = fixed_frame_bytes
     fits = None
     if payload_bytes is not None:
-        fits = (payload_bytes + overhead) <= capacity_bytes
+        # frame_overhead_bytes is returned to the GUI, which computes
+        # `used = messageBytes + frame_overhead_bytes` -- fold THIS message's
+        # actual base64 inflation into it so that comparison is accurate,
+        # instead of the generic (and here, wrong-by-33%) flat constant.
+        frame_overhead_bytes = fixed_frame_bytes + (_base64_len(payload_bytes) - payload_bytes)
+        fits = (fixed_frame_bytes + _base64_len(payload_bytes)) <= capacity_bytes
 
     return CapacityReport(
         cover=cover_info,
@@ -96,7 +118,7 @@ async def check_capacity(
         total_elements=total_elements,
         capacity_bits=capacity_bits,
         capacity_bytes=capacity_bytes,
-        frame_overhead_bytes=overhead,
+        frame_overhead_bytes=frame_overhead_bytes,
         max_message_bytes=max_message_bytes,
         payload_bytes=payload_bytes,
         fits=fits,

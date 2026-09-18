@@ -39,6 +39,34 @@ def test_unimplemented_endpoints_say_so(png_rgb: bytes) -> None:
     assert r.json()["error"] == "not_implemented"
 
 
+def test_capacity_accounts_for_base64_inflation(png_rgb: bytes) -> None:
+    """A message goes into the signed payload as base64 (payload.py's
+    message_b64 field), which costs ~4/3 its raw size, not 1x. For a large
+    custom message this dominates the frame size, so /api/capacity must not
+    report `fits: true` for a message that will actually blow the CapacityError
+    on protect (regression: it used to assume the message was embedded 1:1)."""
+    # 64x64x3 = 12288 elements; at n_lsb=8, raw capacity is 12288 bytes, but a
+    # message anywhere near that size costs ~4/3x once base64'd and will not
+    # actually fit once framed.
+    r = client.post(
+        "/api/capacity",
+        files={"cover": ("t.png", png_rgb, "image/png")},
+        data={"n_lsb": "8", "payload_bytes": "11000"},
+    )
+    assert r.status_code == 200, r.text
+    report = r.json()
+    assert report["fits"] is False, report
+
+    # A message that fits even after base64 inflation should still say so.
+    r_small = client.post(
+        "/api/capacity",
+        files={"cover": ("t.png", png_rgb, "image/png")},
+        data={"n_lsb": "8", "payload_bytes": "100"},
+    )
+    assert r_small.status_code == 200, r_small.text
+    assert r_small.json()["fits"] is True
+
+
 @pytest.mark.parametrize("kind", ["image", "audio"])
 def test_protect_then_verify_roundtrip(kind: str, png_rgb: bytes, wav_16_mono: bytes) -> None:
     """The headline test: protect a cover through the API, download the stego
