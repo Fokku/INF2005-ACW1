@@ -72,7 +72,10 @@ export function VerifyPage() {
             accept=".png,.wav,.avi"
             hint="the file as it arrived"
             file={stego}
-            onChange={setStego}
+            onChange={(f) => {
+              setStego(f)
+              if (f && !mediaId) setMediaId(f.name)
+            }}
             showHash
           />
           <p className="text-xs text-base-content/60">
