@@ -323,8 +323,17 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             outcome.magic_at_expected_start = False
 
         if not outcome.magic_at_expected_start:
-            found = location.scan_for_magic(elements, opts.n_lsb)
+            found = location.scan_for_magic(elements, opts.n_lsb, location.MAX_SCAN_POSITIONS)
             outcome.magic_found_elsewhere = found is not None
+            magic_elements = -(-len(container.MAGIC) * 8 // opts.n_lsb)
+            possible_starts = max(0, n_elements - magic_elements + 1)
+            if found is None and possible_starts > location.MAX_SCAN_POSITIONS:
+                outcome.error = (
+                    f"no payload magic found in the first {location.MAX_SCAN_POSITIONS} candidate "
+                    f"start locations at n_lsb={opts.n_lsb}; the remaining locations were not "
+                    "searched, so payload absence cannot be confirmed. Check the original "
+                    "passphrase, media ID, LSB count, or explicit start offset."
+                )
             return _give_up(outcome, start)
 
         # --- 4. Read the rest of the frame ------------------------------------------

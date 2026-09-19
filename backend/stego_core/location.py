@@ -34,10 +34,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from math import gcd
 from numbers import Integral
 
 from . import container, lsb
 from .errors import CapacityError
+
+MAX_SCAN_POSITIONS = 200_000
 
 
 def _require_integer(value: int, name: str, minimum: int) -> None:
@@ -141,36 +144,45 @@ def reserved_frame_bits(n_elements: int, n_lsb: int) -> int:
     return capacity_bits - capacity_bits // 10
 
 
-def scan_for_magic(elements, n_lsb: int, max_positions: int = 200_000) -> int | None:
-    """Bounded search for the frame MAGIC anywhere in the LSB plane.
+def scan_for_magic(elements, n_lsb: int, max_positions: int = MAX_SCAN_POSITIONS) -> int | None:
+    """Return the earliest element-aligned MAGIC in a bounded LSB search.
 
-    This is what makes `Wrong Start Location` and `Payload Missing` different
-    verdicts:
+    `max_positions` counts candidate starts, from zero up to but excluding
+    that limit. Read enough trailing elements to test the final candidate's
+    complete magic. A marker at a bit position between elements is not a hit.
 
-        magic not at the expected start, but found elsewhere -> Wrong Start Location
-        magic nowhere in the cover                           -> Payload Missing
+    Search at most eight byte alignments of one extracted bit stream. This
+    finds every possible element alignment without a Python loop per element.
+    Returning None means no magic in the searched prefix at this LSB count;
+    it does NOT prove the rest of a larger cover is empty. pipeline.verify
+    reports an incomplete scan through its existing Cannot Verify interface.
 
-    Returns the element index where MAGIC was found, or None.
-
-    Extracts the LSB plane once (capped at `max_positions` elements so a 50 MB
-    WAV cannot hang the request), packs it to bytes, and searches for MAGIC.
-    A frame can start at any ELEMENT, but this byte-aligned search over the
-    packed stream only finds frames whose start is a multiple of 8/gcd(8, n_lsb)
-    elements — good enough for the demo; documented as a known limitation.
+    Magic is only a location hint, not proof of a valid or authentic payload.
+    A found marker does not authorize automatic extraction from that offset.
     """
+    _require_integer(n_lsb, "n_lsb", 1)
     if not 1 <= n_lsb <= 8:
         raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
+    _require_integer(max_positions, "max_positions", 0)
 
-    n_elements = min(len(elements), max_positions)
-    n_bits = (n_elements * n_lsb // 8) * 8  # round down to a whole number of bytes
-    if n_bits <= 0:
+    magic_bits = len(container.MAGIC) * 8
+    magic_elements = -(-magic_bits // n_lsb)
+    positions = min(max_positions, max(0, len(elements) - magic_elements + 1))
+    if positions == 0:
         return None
 
+    n_bits = (positions - 1) * n_lsb + magic_bits
     bits = lsb.extract_bits(elements, 0, n_bits, n_lsb)
-    packed = lsb.bits_to_bytes(bits)
-    byte_index = packed.find(container.MAGIC)
-    if byte_index == -1:
-        return None
-
-    bit_index = byte_index * 8
-    return bit_index // n_lsb
+    earliest = None
+    for shift in range(0, 8, gcd(8, n_lsb)):
+        byte_bits = ((len(bits) - shift) // 8) * 8
+        packed = lsb.bits_to_bytes(bits[shift : shift + byte_bits])
+        byte_index = packed.find(container.MAGIC)
+        while byte_index != -1:
+            bit_index = shift + byte_index * 8
+            if bit_index % n_lsb == 0:
+                start = bit_index // n_lsb
+                earliest = start if earliest is None else min(earliest, start)
+                break  # later hits in this alignment cannot be earlier
+            byte_index = packed.find(container.MAGIC, byte_index + 1)
+    return earliest

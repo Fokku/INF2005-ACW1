@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from stego_core import audio_codec, image_codec, pipeline, signing
+from stego_core import audio_codec, image_codec, location, pipeline, signing
 from stego_core.errors import CapacityError, StegoError
 from stego_core.verdict import Verdict
 
@@ -165,3 +165,83 @@ def test_api_protect_rejects_invalid_offset_without_server_error(location_option
     )
     assert response.status_code == 400
     assert "start" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("n_lsb", range(1, 9))
+def test_wrong_explicit_offset_finds_non_byte_aligned_frame(location_options, location_keys, n_lsb):
+    options = replace(location_options, n_lsb=n_lsb, explicit_start=137)
+    protected = pipeline.protect(options)
+    receiver = replace(_verify_options(options, protected, location_keys[1]), explicit_start=138)
+    verified = pipeline.verify(receiver)
+    assert verified.verdict is Verdict.WRONG_START_LOCATION, verified.reasons
+    assert verified.start_offset_used == 138
+    assert verified.payload_json is None  # diagnostic scanning must not silently extract elsewhere
+
+
+@pytest.mark.parametrize("n_lsb", [1, 3, 8])
+def test_wrong_passphrase_finds_frame_without_revealing_payload(location_options, location_keys, n_lsb):
+    options = replace(location_options, n_lsb=n_lsb, explicit_start=None, passphrase="phase-one-passphrase")
+    protected = pipeline.protect(options)
+    receiver = replace(
+        _verify_options(options, protected, location_keys[1]), passphrase="phase-two-wrong-passphrase"
+    )
+    verified = pipeline.verify(receiver)
+    assert verified.start_offset_used != protected.start_offset
+    assert verified.verdict is Verdict.WRONG_START_LOCATION, verified.reasons
+    assert verified.payload_json is None
+
+
+def test_scan_limit_does_not_claim_a_later_payload_is_missing(location_options, location_keys, monkeypatch):
+    # Smaller budget exercises the production limit path with ordinary test
+    # covers; unit tests independently check the candidate-boundary semantics.
+    monkeypatch.setattr(location, "MAX_SCAN_POSITIONS", 64)
+    protected = pipeline.protect(location_options)  # start 137 is beyond the diagnostic search
+    receiver = _verify_options(location_options, protected, location_keys[1])
+    wrong = pipeline.verify(replace(receiver, explicit_start=0))
+    assert wrong.verdict is Verdict.CANNOT_VERIFY
+    assert "first 64 candidate" in wrong.reasons[0]
+    assert "not searched" in wrong.reasons[0]
+    assert wrong.payload_json is None
+
+    # Knowing the correct location still works, regardless of the scan limit.
+    correct = pipeline.verify(receiver)
+    assert correct.verdict is Verdict.AUTHENTIC, correct.reasons
+    assert correct.start_offset_used == 137
+
+
+def test_wrong_offset_scan_includes_last_candidate(location_options, location_keys, monkeypatch):
+    monkeypatch.setattr(location, "MAX_SCAN_POSITIONS", 138)
+    protected = pipeline.protect(location_options)  # last candidate is 137
+    receiver = replace(_verify_options(location_options, protected, location_keys[1]), explicit_start=0)
+    verified = pipeline.verify(receiver)
+    assert verified.verdict is Verdict.WRONG_START_LOCATION, verified.reasons
+
+
+@pytest.mark.parametrize("limited", [False, True])
+def test_absent_payload_distinguishes_complete_and_incomplete_scan(
+    location_options, location_keys, monkeypatch, limited
+):
+    options = location_options
+    # All-zero samples guarantee there is no accidental MAGIC in either cover.
+    if options.cover_kind == "image":
+        cover = image_codec.load_png(options.cover_bytes)
+        cover.elements.fill(0)
+        data = image_codec.save_png(cover, cover.elements)
+    else:
+        cover = audio_codec.load_wav(options.cover_bytes)
+        cover.elements.fill(0)
+        data = audio_codec.save_wav(cover, cover.elements)
+    if limited:
+        monkeypatch.setattr(location, "MAX_SCAN_POSITIONS", 64)
+    verified = pipeline.verify(
+        pipeline.VerifyOptions(
+            stego_bytes=data,
+            cover_kind=options.cover_kind,
+            public_key_pem=location_keys[1],
+            n_lsb=options.n_lsb,
+            media_id=options.media_id,
+            explicit_start=0,
+        )
+    )
+    expected = Verdict.CANNOT_VERIFY if limited else Verdict.PAYLOAD_MISSING
+    assert verified.verdict is expected, verified.reasons
