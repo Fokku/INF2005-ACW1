@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 OUT_DIR = Path(__file__).resolve().parents[2] / "out"
 
@@ -44,7 +45,7 @@ def save(data: bytes, filename: str) -> dict:
         "size_bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
         "url": f"/api/files/{file_id}",
-        "download_url": f"/api/files/{file_id}?download=1",
+        "download_url": f"/api/files/{file_id}?download=1&filename={quote(filename)}",
     }
 
 

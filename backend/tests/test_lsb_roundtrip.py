@@ -15,8 +15,6 @@ from stego_core import lsb
 @pytest.mark.parametrize("n_lsb", range(1, 9))
 @pytest.mark.parametrize("dtype", [np.uint8, np.uint16])
 def test_embed_extract_roundtrip(n_lsb: int, dtype) -> None:
-    pytest.skip("TODO(team): remove this skip once lsb.embed_bits/extract_bits exist")
-
     rng = np.random.default_rng(seed=n_lsb)
     elements = rng.integers(0, 256, size=5000, dtype=dtype)
     message = b"INF2005 ACW1 round-trip check"
@@ -33,8 +31,6 @@ def test_embed_extract_roundtrip(n_lsb: int, dtype) -> None:
 def test_only_low_bits_change(n_lsb: int) -> None:
     """Embedding must leave the high bits alone — that is what makes the stable
     hash work and what keeps the distortion invisible."""
-    pytest.skip("TODO(team): remove this skip once lsb.embed_bits exists")
-
     rng = np.random.default_rng(seed=99)
     elements = rng.integers(0, 256, size=2000, dtype=np.uint8)
     bits = lsb.bytes_to_bits(b"x" * 50)
@@ -50,3 +46,12 @@ def test_capacity_bits() -> None:
     assert lsb.capacity_bits(1000, 8) == 8000
     with pytest.raises(ValueError):
         lsb.capacity_bits(1000, 9)
+
+
+def test_bits_to_bytes_rejects_non_byte_aligned_length() -> None:
+    """np.packbits silently zero-pads a short length instead of raising —
+    bits_to_bytes must not inherit that footgun, since a caller mistake here
+    would otherwise surface as a mysterious hash/signature mismatch far from
+    its actual cause instead of failing immediately and clearly."""
+    with pytest.raises(ValueError):
+        lsb.bits_to_bytes(np.array([1, 0, 1, 0, 1], dtype=np.uint8))

@@ -41,8 +41,8 @@ class ExtractionOutcome:
 def decide(outcome: ExtractionOutcome) -> tuple[Verdict, list[str]]:
     """Map an ExtractionOutcome to (verdict, reasons).
 
-    TODO(team): implement. The order of these checks IS the design — write the
-    same table into docs/design/verdict-table.md.
+    The order of these checks IS the design — the same table is written into
+    docs/design/verdict-table.md.
 
       1. not cover_supported, or not public_key_usable, or an unexpected error
                                                         -> CANNOT_VERIFY
@@ -55,11 +55,61 @@ def decide(outcome: ExtractionOutcome) -> tuple[Verdict, list[str]]:
       6. signature fine but recomputed media hash differs, or the frame's
          parameters disagree with the signed ones       -> TAMPERED
       7. everything checks out                          -> AUTHENTIC
-
-    Always return at least one reason string. The GUI shows them verbatim, and
-    the demo is far more convincing when the tool says WHY.
     """
-    raise NotImplementedError("TODO(team): decide — see docstring")
+    if not outcome.cover_supported:
+        return Verdict.CANNOT_VERIFY, [outcome.error or "cover file format is not supported"]
+    if not outcome.public_key_usable:
+        return Verdict.CANNOT_VERIFY, [outcome.error or "public key is missing or malformed"]
+    if outcome.error:
+        return Verdict.CANNOT_VERIFY, [outcome.error]
+
+    if not outcome.magic_at_expected_start:
+        if outcome.magic_found_elsewhere:
+            return Verdict.WRONG_START_LOCATION, [
+                (
+                    "payload magic was not found at the expected start location, but was found "
+                    "elsewhere in the cover — check the passphrase / explicit start offset"
+                )
+            ]
+        return Verdict.PAYLOAD_MISSING, [
+            (
+                "no embedded payload could be found anywhere in this cover — it may never have "
+                "been protected, or the LSB plane was destroyed by re-encoding"
+            )
+        ]
+
+    if not outcome.frame_parsed or outcome.crc_ok is False or not outcome.payload_parsed:
+        return Verdict.TAMPERED, [
+            outcome.error
+            or (
+                "the embedded frame failed its CRC check or would not parse — the stego file "
+                "was altered after protection"
+            )
+        ]
+
+    if outcome.signature_valid is False:
+        return Verdict.SIGNATURE_INVALID, [
+            (
+                "the digital signature does not verify against the supplied public key — wrong "
+                "key, or the signed payload was altered"
+            )
+        ]
+
+    reasons: list[str] = []
+    tampered = False
+    if outcome.hash_match is False:
+        tampered = True
+        reasons.append("the recomputed media hash does not match the hash signed into the payload")
+    if outcome.params_match is False:
+        tampered = True
+        reasons.append(
+            "the cover's actual parameters (n_lsb / shape / cover kind / media ID) do not "
+            "match the signed payload"
+        )
+    if tampered:
+        return Verdict.TAMPERED, reasons
+
+    return Verdict.AUTHENTIC, ["signature valid, media hash matches, parameters match the signed payload"]
 
 
 @dataclass

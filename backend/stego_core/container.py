@@ -25,7 +25,13 @@ is it? was it damaged? This layout answers all three:
 
 from __future__ import annotations
 
-import struct  # noqa: F401  (used by build_frame / parse_frame once implemented)
+import struct
+import zlib
+
+from .errors import FrameError
+
+_HEADER_STRUCT = struct.Struct(">4sBBBIH")  # magic, version, flags, n_lsb, payload_len, sig_len
+_CRC_STRUCT = struct.Struct(">I")
 
 MAGIC = b"ACW1"
 FRAME_VERSION = 1
@@ -45,21 +51,17 @@ def frame_size_bits(payload_len: int, sig_len: int) -> int:
 
 
 def build_frame(payload_bytes: bytes, signature: bytes, n_lsb: int, encrypted: bool) -> bytes:
-    """Assemble the frame above.
+    """Assemble the frame above."""
+    if not 1 <= n_lsb <= 8:
+        raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
+    if len(payload_bytes) > 0xFFFFFFFF or len(signature) > 0xFFFF:
+        raise ValueError("payload or signature too large for the frame header's length fields")
 
-    TODO(team): implement.
-
-    Sketch:
-      flags = FLAG_ENCRYPTED if encrypted else 0
-      head  = MAGIC + struct.pack(">BBBIH", FRAME_VERSION, flags, n_lsb,
-                                  len(payload_bytes), len(signature))
-      body  = head + payload_bytes + signature
-      return body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
-
-    Check that len(head) == HEADER_SIZE, or the constant and the format string
-    have drifted apart.
-    """
-    raise NotImplementedError("TODO(team): build_frame — see docstring")
+    flags = FLAG_ENCRYPTED if encrypted else 0
+    head = _HEADER_STRUCT.pack(MAGIC, FRAME_VERSION, flags, n_lsb, len(payload_bytes), len(signature))
+    assert len(head) == HEADER_SIZE, "HEADER_SIZE constant and _HEADER_STRUCT have drifted apart"
+    body = head + payload_bytes + signature
+    return body + _CRC_STRUCT.pack(zlib.crc32(body) & 0xFFFFFFFF)
 
 
 def parse_frame(data: bytes) -> tuple[bytes, bytes, int, bool]:
@@ -68,13 +70,24 @@ def parse_frame(data: bytes) -> tuple[bytes, bytes, int, bool]:
     Raises FrameError (from .errors) if the magic is wrong, the version is
     unknown, the lengths are impossible, or the CRC fails.
 
-    TODO(team): implement.
-
     Two-step read matters here: the caller only knows HEADER_SIZE up front, so
     parse the header first, learn PAYLOAD_LEN and SIG_LEN, and only then ask the
     LSB layer for the remaining bits. See `pipeline.verify`.
     """
-    raise NotImplementedError("TODO(team): parse_frame — see docstring")
+    payload_len, sig_len, n_lsb, encrypted = parse_header(data)
+    total = HEADER_SIZE + payload_len + sig_len + CRC_SIZE
+    if len(data) < total:
+        raise FrameError(f"frame truncated: need {total} bytes, have {len(data)}")
+
+    body = data[: HEADER_SIZE + payload_len + sig_len]
+    (crc_stored,) = _CRC_STRUCT.unpack_from(data, HEADER_SIZE + payload_len + sig_len)
+    crc_actual = zlib.crc32(body) & 0xFFFFFFFF
+    if crc_stored != crc_actual:
+        raise FrameError(f"CRC mismatch: expected {crc_actual:#010x}, frame says {crc_stored:#010x}")
+
+    payload_bytes = data[HEADER_SIZE : HEADER_SIZE + payload_len]
+    signature = data[HEADER_SIZE + payload_len : HEADER_SIZE + payload_len + sig_len]
+    return payload_bytes, signature, n_lsb, encrypted
 
 
 def parse_header(data: bytes) -> tuple[int, int, int, bool]:
@@ -82,8 +95,17 @@ def parse_header(data: bytes) -> tuple[int, int, int, bool]:
 
     Returns (payload_len, sig_len, n_lsb, encrypted) so the caller knows how many
     more bits to read. Raises FrameError if MAGIC does not match.
-
-    TODO(team): implement.
-    Sketch: struct.unpack(">4sBBBIH", data[:HEADER_SIZE])
     """
-    raise NotImplementedError("TODO(team): parse_header — see docstring")
+    if len(data) < HEADER_SIZE:
+        raise FrameError(f"frame header truncated: need {HEADER_SIZE} bytes, have {len(data)}")
+
+    magic, version, flags, n_lsb, payload_len, sig_len = _HEADER_STRUCT.unpack_from(data, 0)
+    if magic != MAGIC:
+        raise FrameError(f"bad magic: {magic!r} (expected {MAGIC!r})")
+    if version != FRAME_VERSION:
+        raise FrameError(f"unsupported frame version: {version}")
+    if not 1 <= n_lsb <= 8:
+        raise FrameError(f"frame header claims impossible n_lsb: {n_lsb}")
+
+    encrypted = bool(flags & FLAG_ENCRYPTED)
+    return payload_len, sig_len, n_lsb, encrypted
