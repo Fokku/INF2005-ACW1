@@ -34,11 +34,41 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from numbers import Integral
 
 from . import container, lsb
 from .errors import CapacityError
 
-MAX_COUNTER = 64  # give up after this many derivation attempts
+
+def _require_integer(value: int, name: str, minimum: int) -> None:
+    if isinstance(value, bool) or not isinstance(value, Integral) or value < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {value!r}")
+
+
+def _required_elements(n_elements: int, frame_bits: int, n_lsb: int) -> int:
+    _require_integer(n_elements, "n_elements", 0)
+    _require_integer(frame_bits, "frame_bits", 1)
+    _require_integer(n_lsb, "n_lsb", 1)
+    if n_lsb > 8:
+        raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
+    return -(-frame_bits // n_lsb)
+
+
+def validate_start(n_elements: int, start: int, frame_bits: int, n_lsb: int) -> None:
+    """FR7: require a nonnegative element index with room for the whole frame.
+
+    The final valid offset is n_elements - ceil(frame_bits / n_lsb), inclusive.
+    Invalid numbers raise ValueError; insufficient remaining room raises
+    CapacityError. The caller must use the actual frame size when protecting.
+    """
+    _require_integer(start, "start", 0)
+    needed = _required_elements(n_elements, frame_bits, n_lsb)
+    if start + needed > n_elements:
+        raise CapacityError(
+            f"start {start} needs {needed} elements at n_lsb={n_lsb}, but only "
+            f"{max(0, n_elements - start)} elements are remaining; "
+            f"cover has {n_elements} elements"
+        )
 
 
 def derive_start(
@@ -51,9 +81,10 @@ def derive_start(
 ) -> int:
     """Deterministically choose a start element index.
 
-    The frame must fit between the start and the end of the cover, so the
-    modulus is (usable elements - elements the frame needs), and the counter is
-    incremented until a candidate fits.
+    Keep the original HMAC message (counter zero) and modulus for compatibility
+    with existing stego files. If the reservation exactly fills the cover,
+    zero is the only valid start. Otherwise the legacy formula excludes the
+    last fitting offset; explicit mode can still select that offset.
 
     >>> WHY `frame_bits` HERE IS NOT THE TRUE FRAME SIZE: the verifier calls
     >>> this function BEFORE it has read anything, so it cannot know the real
@@ -65,32 +96,32 @@ def derive_start(
     >>> length. This confines the derived start to (roughly) the first 10% of
     >>> the cover, which guarantees at least the other 90% as trailing room for
     >>> the real frame. `pipeline.protect` still separately checks the FULL frame
-    >>> fits via `lsb.embed_bits`'s own capacity check (an unusually large
+    >>> fits via `validate_start` before embedding (an unusually large
     >>> custom payload can still legitimately exceed the reserve and raise
     >>> CapacityError), and `pipeline.verify` learns the true payload/signature
     >>> lengths by reading the header it finds at that offset.
     """
-    needed = -(-frame_bits // n_lsb)  # ceil division
+    needed = _required_elements(n_elements, frame_bits, n_lsb)
+    if not isinstance(k_loc, (bytes, bytearray)) or not k_loc:
+        raise ValueError("k_loc must be a nonempty byte key")
     span = n_elements - needed
-    if span <= 0:
+    if span < 0:
         raise CapacityError(
             f"cover has only {n_elements} elements, not enough room for a "
-            f"{needed}-element header at n_lsb={n_lsb}"
+            f"{needed}-element reservation at n_lsb={n_lsb}"
         )
+    if span == 0:
+        return 0
 
-    for counter in range(MAX_COUNTER):
-        msg = (
-            b"start"
-            + media_id.encode("utf-8")
-            + cover_kind.encode("utf-8")
-            + bytes([n_lsb])
-            + counter.to_bytes(4, "big")
-        )
-        digest = hmac.new(k_loc, msg, hashlib.sha256).digest()
-        start = int.from_bytes(digest, "big") % span
-        return start  # every candidate fits by construction of `span`
-
-    raise CapacityError(f"could not derive a start location in {MAX_COUNTER} attempts")  # pragma: no cover
+    msg = (
+        b"start"
+        + media_id.encode("utf-8")
+        + cover_kind.encode("utf-8")
+        + bytes([n_lsb])
+        + (0).to_bytes(4, "big")
+    )
+    digest = hmac.new(k_loc, msg, hashlib.sha256).digest()
+    return int.from_bytes(digest, "big") % span
 
 
 def reserved_frame_bits(n_elements: int, n_lsb: int) -> int:
@@ -101,9 +132,11 @@ def reserved_frame_bits(n_elements: int, n_lsb: int) -> int:
     not the true frame size, which only protect knows in advance. Confines the
     derived start to (roughly) the first 10% of the cover, guaranteeing at
     least the other 90% of raw capacity as trailing room for whatever frame
-    actually gets embedded — comfortable headroom for any message that also
-    passes the blanket "does it fit at all" capacity check in pipeline.protect.
+    actually gets embedded. A frame larger than the reservation may still fit,
+    but must pass the separate check against space after the derived offset.
     """
+    _require_integer(n_elements, "n_elements", 0)
+    _require_integer(n_lsb, "n_lsb", 1)
     capacity_bits = lsb.capacity_bits(n_elements, n_lsb)
     return capacity_bits - capacity_bits // 10
 

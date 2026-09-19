@@ -173,8 +173,6 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
 
     if opts.explicit_start is not None:
         start = opts.explicit_start
-        if start < 0:
-            raise ValueError(f"explicit_start must be >= 0, got {start}")
     else:
         if derived is None:
             raise StegoError("a passphrase is required for derived start-location mode")
@@ -189,6 +187,13 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
             n_elements,
             location.reserved_frame_bits(n_elements, opts.n_lsb),
         )
+
+    # FR7: raw capacity alone does not guarantee room after the selected start.
+    # Use the actual frame length here, not the derived-mode reservation.
+    try:
+        location.validate_start(n_elements, start, len(frame) * 8, opts.n_lsb)
+    except ValueError as exc:
+        raise StegoError(str(exc)) from exc
 
     bits = lsb.bytes_to_bits(frame)
     new_elements = lsb.embed_bits(elements, bits, start, opts.n_lsb)
@@ -294,6 +299,14 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
         else:
             outcome.error = "no passphrase or explicit start offset was supplied"
             return _give_up(outcome, None)
+
+        # Only the header size is known before extraction. Reject impossible
+        # locations as invalid settings, rather than scanning for another one.
+        try:
+            location.validate_start(n_elements, start, container.HEADER_SIZE * 8, opts.n_lsb)
+        except (ValueError, CapacityError) as exc:
+            outcome.error = str(exc)
+            return _give_up(outcome, start)
 
         # --- 3. Read the header at that start --------------------------------------
         header_needed = -(-container.HEADER_SIZE * 8 // opts.n_lsb)

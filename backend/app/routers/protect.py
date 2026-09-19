@@ -40,6 +40,9 @@ async def protect(
     """Embed and sign, then return the stego file plus everything the demo needs
     to explain what happened.
     """
+    if start_mode == StartMode.explicit and explicit_start is None:
+        raise HTTPException(status_code=400, detail="explicit start mode requires an explicit_start offset")
+
     cover_bytes = await cover.read()
     kind = _sniff_kind(cover.filename or "")
 
