@@ -58,10 +58,10 @@ Run from the repository root:
 .venv/bin/python -m ruff check backend
 ```
 
-On Windows, use `.venv\\Scripts\\python.exe` instead. The focused total is 315 tests; together
-with 78 inherited tests, the current backend total is 393. Counts describe this branch at the time
-of writing and should be updated if the suite changes. Unrelated pre-existing formatting was not
-rewritten as part of FR7/FR8.
+On Windows, use `.venv\\Scripts\\python.exe` instead. The focused FR7/FR8 total is 315 tests; with
+the 78 tests inherited at that phase, the backend total was 393 when FR7/FR8 completed. Later FR9
+tests do not change this focused count. Unrelated pre-existing formatting was not rewritten as part
+of FR7/FR8.
 
 ## 4. AI-use record for team review
 

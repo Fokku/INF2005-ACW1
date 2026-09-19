@@ -104,7 +104,7 @@ Do this after A–D. It is mostly plumbing.
 - [x] Make `tests/test_api.py::test_protect_then_verify_roundtrip` pass for image and audio
 
 The frontend needs no changes — it already calls all of these correctly. Full backend suite is
-393/393 green after the focused FR7/FR8 additions (`.venv/bin/python -m pytest -q backend/tests`);
+459/459 green after the focused FR7-FR9 additions (`.venv/bin/python -m pytest -q backend/tests`);
 the only thing left producing a `501 not_implemented` at the API level is `/api/attack`.
 
 ### FR7/FR8 assigned contribution — Ridwan (done)
@@ -121,6 +121,21 @@ codec, or pipeline implementations.
 See `docs/design/fr7-fr8-contributions.md` for the exact ownership boundary and reproducible test
 commands. Screenshots, samples, manual demo evidence, and the final team contribution statement
 remain in workstreams H and I.
+
+### FR9 supporting contribution — Ridwan (done; final owner to be confirmed)
+
+The work-split document leaves FR9's owner cell blank. Zong Han contributed the original
+`stable_media_hash` implementation and pipeline comparison; the work below tests and hardens that
+foundation without claiming FR10.
+
+- [x] Stable SHA-256 unit coverage for image/audio dtypes and LSB depths 1-8
+- [x] Image/audio protect-to-verify comparison tests in explicit and derived modes
+- [x] Canonical 64-character lowercase digest validation at payload decoding
+- [x] API checks for separate embedded/recomputed hashes and `hash_match`
+- [x] `docs/design/hash-verification.md` with algorithm, scope, tests, and security limitations
+
+FR9-focused additions contribute 66 tests; screenshots, samples, transfer evidence, FR10, and the
+final team ownership statement remain outside this contribution.
 
 ## F · Attack lab and innovation — `attacks.py`
 
@@ -146,6 +161,7 @@ Can start now. These are what the demo explanation is read from.
 - [x] `start-location.md` — FR7 selection, recovery, validation, and security limits (Ridwan)
 - [x] `extraction.md` — FR8 bounded extraction, decoding, failure mapping, and limits (Ridwan)
 - [x] `fr7-fr8-contributions.md` — scoped ownership, test record, and AI-use note (Ridwan)
+- [x] `hash-verification.md` — FR9 formula, workflow, test record, and limitations (Ridwan support)
 - [ ] `verdict-table.md` — each verdict, its trigger condition, and the test that proves it
 - [ ] `threat-model.md` — what the design defends against, and what it does not
 - [ ] `limitations-and-ai-use.md` — honest limits (magic bytes are scannable, LSB is fragile and
