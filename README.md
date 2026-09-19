@@ -5,9 +5,9 @@ A GUI-based **LSB-replacement steganography** tool that protects a PNG image and
 
 > **Status: core pipeline working.** The web UI, the API, and the full protect → verify round trip
 > (LSB embed/extract, hashing, Ed25519 signing, start-location derivation, all six verdicts) work
-> end to end for image, audio, and video covers — 78/78 backend tests green. What's left is the
+> end to end for image, audio, and video covers — 393/393 backend tests green. What's left is the
 > Attack Lab backend (`stego_core/attacks.py`, `/api/attack` still answers `501`), the `stego` CLI
-> commands, `docs/design/` (still empty), and `scripts/make_samples.py` / `evidence/`.
+> commands, the remaining team-wide `docs/design/` files, and `scripts/make_samples.py` / `evidence/`.
 > See [TODO.md](TODO.md) for the nine workstreams and [TECH_STACK.md](TECH_STACK.md) for the stack.
 >
 > Find your work with: `grep -rn "TODO(team)" backend frontend scripts`
@@ -125,7 +125,7 @@ Exact dates: to be confirmed by the team once the lab schedule is published.
 - [TECH_STACK.md](TECH_STACK.md) — stack, versions, layout, commands, non-negotiable engineering rules
 - [TODO.md](TODO.md) — every section and feature that has to be done, with spec references
 - [docs/spec/INF2005-ACW1-spec-v5.md](docs/spec/INF2005-ACW1-spec-v5.md) — the assignment specification
-- `docs/design/` — design notes required for the demo and rubric criterion 1 (to be written)
+- `docs/design/` — FR7/FR8 notes are complete; remaining team-wide design notes are still required
 
 ## Use of generative AI
 

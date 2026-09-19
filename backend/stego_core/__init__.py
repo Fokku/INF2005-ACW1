@@ -15,6 +15,7 @@ Module map (see TODO.md for who does what):
     payload.py      the verification payload (media ID, timestamp, hash, nonce, metadata)
     container.py    the byte frame that is actually embedded
     location.py     where the payload starts, and how the verifier finds it again
+    extraction.py   bounded frame extraction and strict payload decoding
     verdict.py      the six verdict categories and the decision table
     pipeline.py     protect() and verify() — glues everything together
     attacks.py      tamper simulations for the negative test cases
