@@ -24,6 +24,19 @@ def test_sha256_hex_known_vector() -> None:
     )
 
 
+@pytest.mark.parametrize("digest", ["0" * 64, "0123456789abcdef" * 4])
+def test_sha256_digest_validation_accepts_canonical_lowercase_hex(digest: str) -> None:
+    assert hashing.is_sha256_hex_digest(digest)
+
+
+@pytest.mark.parametrize(
+    "digest",
+    [None, 123, "", "a" * 63, "a" * 65, "A" * 64, "g" * 64, ("a" * 63) + " "],
+)
+def test_sha256_digest_validation_rejects_noncanonical_values(digest: object) -> None:
+    assert not hashing.is_sha256_hex_digest(digest)
+
+
 @pytest.mark.parametrize("n_lsb", range(1, 9))
 @pytest.mark.parametrize("dtype,header", [(np.uint8, IMAGE_HEADER), (np.uint16, AUDIO_HEADER)])
 def test_stable_hash_ignores_selected_carrier_bits(n_lsb: int, dtype, header) -> None:

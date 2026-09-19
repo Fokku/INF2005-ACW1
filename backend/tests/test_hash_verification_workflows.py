@@ -6,10 +6,14 @@ derived start modes. They do not redefine the FR10 verdict decision table.
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
+from fastapi.testclient import TestClient
 
-from stego_core import audio_codec, image_codec, pipeline, signing
+from app.main import app
+from stego_core import audio_codec, container, image_codec, lsb, pipeline, signing
 from stego_core.verdict import Verdict
 
 
@@ -98,3 +102,59 @@ def test_content_change_above_lsb_plane_causes_hash_mismatch_after_valid_extract
     assert verified.media_hash_recomputed != verified.media_hash_embedded
     assert verified.verdict is Verdict.TAMPERED, verified.reasons
     assert any("media hash" in reason for reason in verified.reasons)
+
+
+@pytest.mark.parametrize("kind", ["image", "audio"])
+def test_verify_api_reports_embedded_and_recomputed_hashes_separately(
+    kind, png_rgb, wav_16_stereo, hash_keys
+):
+    options = _protect_options(kind, "explicit", png_rgb, wav_16_stereo, hash_keys[0])
+    protected = pipeline.protect(options)
+    suffix, content_type = ("png", "image/png") if kind == "image" else ("wav", "audio/wav")
+    response = TestClient(app).post(
+        "/api/verify",
+        files={
+            "stego": (f"stego.{suffix}", protected.stego_bytes, content_type),
+            "public_key_pem": ("public.pem", hash_keys[1], "application/x-pem-file"),
+        },
+        data={
+            "media_id": options.media_id,
+            "n_lsb": str(options.n_lsb),
+            "start_mode": "explicit",
+            "explicit_start": str(options.explicit_start),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    report = response.json()
+    expected = protected.payload_json["media_hash"]
+    assert report["media_hash_embedded"] == expected
+    assert report["media_hash_recomputed"] == expected
+    assert report["hash_match"] is True
+    assert report["payload"]["media_hash"] == expected
+
+
+@pytest.mark.parametrize("kind", ["image", "audio"])
+def test_signed_payload_with_noncanonical_hash_is_rejected_cleanly(
+    kind, png_rgb, wav_16_stereo, hash_keys
+):
+    options = _protect_options(kind, "explicit", png_rgb, wav_16_stereo, hash_keys[0])
+    protected = pipeline.protect(options)
+    fields = {**protected.payload_json, "media_hash": "A" * 64}
+    payload_bytes = json.dumps(
+        fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    signature = signing.sign(hash_keys[0], payload_bytes)
+    frame = container.build_frame(payload_bytes, signature, options.n_lsb, False)
+    load, save = _codecs(kind)
+    cover = load(protected.stego_bytes)
+    elements = lsb.embed_bits(
+        cover.elements, lsb.bytes_to_bits(frame), protected.start_offset, options.n_lsb
+    )
+
+    verified = pipeline.verify(_verify_options(options, save(cover, elements), hash_keys[1]))
+
+    assert verified.verdict is Verdict.TAMPERED, verified.reasons
+    assert verified.payload_json is None
+    assert verified.media_hash_embedded is None
+    assert any("64-character lowercase SHA-256" in reason for reason in verified.reasons)

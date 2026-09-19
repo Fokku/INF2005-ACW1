@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import container, location, lsb, signing
+from . import container, hashing, location, lsb, signing
 from . import payload as payload_mod
 from .errors import CapacityError, FrameError
 
@@ -62,6 +62,8 @@ def decode_payload(frame: ExtractedFrame) -> payload_mod.Payload:
     for name in ("media_id", "timestamp", "media_hash", "nonce", "cover_kind", "message_mime"):
         if not isinstance(getattr(pl, name), str):
             raise FrameError(f"payload {name} must be a string")
+    if not hashing.is_sha256_hex_digest(pl.media_hash):
+        raise FrameError("payload media_hash must be a 64-character lowercase SHA-256 hex digest")
     if pl.cover_kind not in ("image", "audio", "video"):
         raise FrameError("unsupported payload cover kind")
     if type(pl.n_lsb) is not int or not 1 <= pl.n_lsb <= 8:
