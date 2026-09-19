@@ -112,6 +112,8 @@ def extract_bits(elements: np.ndarray, start: int, n_bits: int, n_lsb: int) -> n
         raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
     if start < 0:
         raise ValueError(f"start must be >= 0, got {start}")
+    if n_bits < 0:
+        raise ValueError(f"n_bits must be >= 0, got {n_bits}")
 
     n_elements = -(-n_bits // n_lsb)  # ceil division
     if start + n_elements > len(elements):

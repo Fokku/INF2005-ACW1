@@ -16,7 +16,18 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from . import audio_codec, container, hashing, image_codec, kdf, location, lsb, signing, video_codec
+from . import (
+    audio_codec,
+    container,
+    extraction,
+    hashing,
+    image_codec,
+    kdf,
+    location,
+    lsb,
+    signing,
+    video_codec,
+)
 from . import payload as payload_mod
 from .errors import CapacityError, FrameError, KeyError_, StegoError, UnsupportedCoverError
 from .verdict import ExtractionOutcome, Verdict, decide
@@ -231,8 +242,10 @@ class VerifyOutcome:
     signature_valid: bool | None = None
 
 
-def _give_up(outcome: ExtractionOutcome, start: int | None) -> VerifyOutcome:
+def _give_up(outcome: ExtractionOutcome, start: int | None, detail: str | None = None) -> VerifyOutcome:
     verdict, reasons = decide(outcome)
+    if detail is not None:
+        reasons.append(detail)
     return VerifyOutcome(
         verdict=verdict,
         reasons=reasons,
@@ -250,11 +263,11 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
     Order of operations:
       1. Decode the stego object. UnsupportedCoverError -> CANNOT_VERIFY.
       2. Resolve the start: explicit offset, or location.derive_start(...).
-      3. Read HEADER_SIZE*8 bits there and container.parse_header(...).
+      3. Read the magic at that start.
          No MAGIC? -> location.scan_for_magic(...) decides between
          WRONG_START_LOCATION and PAYLOAD_MISSING.
-      4. Read the rest of the frame using the lengths from the header, then
-         container.parse_frame(...).
+      4. extraction.extract_frame validates the header and lengths, then
+         extracts the exact payload and signature bytes with a CRC check.
       5. signing.verify(public_pem, payload_bytes, signature).
       6. payload.deserialize, then recompute hashing.stable_media_hash with the
          n_lsb and header fields FROM THE SIGNED PAYLOAD, and compare.
@@ -300,27 +313,18 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             outcome.error = "no passphrase or explicit start offset was supplied"
             return _give_up(outcome, None)
 
-        # Only the header size is known before extraction. Reject impossible
-        # locations as invalid settings, rather than scanning for another one.
+        # A location must hold the magic before we can recognize a frame.
+        # If magic survives but the header is truncated, extraction reports
+        # a damaged frame instead of treating it as a wrong location.
         try:
-            location.validate_start(n_elements, start, container.HEADER_SIZE * 8, opts.n_lsb)
+            location.validate_start(n_elements, start, len(container.MAGIC) * 8, opts.n_lsb)
         except (ValueError, CapacityError) as exc:
             outcome.error = str(exc)
             return _give_up(outcome, start)
 
-        # --- 3. Read the header at that start --------------------------------------
-        header_needed = -(-container.HEADER_SIZE * 8 // opts.n_lsb)
-        payload_len = sig_len = frame_n_lsb = None
-        if 0 <= start and start + header_needed <= n_elements:
-            try:
-                header_bits = lsb.extract_bits(elements, start, container.HEADER_SIZE * 8, opts.n_lsb)
-                header_bytes = lsb.bits_to_bytes(header_bits)
-                payload_len, sig_len, frame_n_lsb, _frame_encrypted = container.parse_header(header_bytes)
-                outcome.magic_at_expected_start = True
-            except (FrameError, CapacityError):
-                outcome.magic_at_expected_start = False
-        else:
-            outcome.magic_at_expected_start = False
+        # --- 3. Distinguish absent magic from a present but damaged frame -----------
+        magic_bits = lsb.extract_bits(elements, start, len(container.MAGIC) * 8, opts.n_lsb)
+        outcome.magic_at_expected_start = lsb.bits_to_bytes(magic_bits) == container.MAGIC
 
         if not outcome.magic_at_expected_start:
             found = location.scan_for_magic(elements, opts.n_lsb, location.MAX_SCAN_POSITIONS)
@@ -337,32 +341,25 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             return _give_up(outcome, start)
 
         # --- 4. Read the rest of the frame ------------------------------------------
-        frame_bits_total = container.frame_size_bits(payload_len, sig_len)
-        frame_needed = -(-frame_bits_total // opts.n_lsb)
         try:
-            if start + frame_needed > n_elements:
-                raise FrameError("frame extends past the end of the cover")
-            frame_bit_array = lsb.extract_bits(elements, start, frame_bits_total, opts.n_lsb)
-            frame_bytes_full = lsb.bits_to_bytes(frame_bit_array)
-            payload_bytes, signature, _frame_n_lsb2, _frame_encrypted2 = container.parse_frame(
-                frame_bytes_full
-            )
+            frame = extraction.extract_frame(elements, start, opts.n_lsb)
+            payload_bytes, signature = frame.payload_bytes, frame.signature
+            frame_n_lsb = frame.n_lsb
             outcome.frame_parsed = True
             outcome.crc_ok = True
         except (FrameError, CapacityError) as exc:
             outcome.frame_parsed = False
-            outcome.crc_ok = False
-            outcome.error = str(exc)
-            return _give_up(outcome, start)
+            # Expected damaged-input status belongs to the existing frame-failed
+            # rule. outcome.error is reserved for Cannot Verify conditions.
+            return _give_up(outcome, start, detail=str(exc))
 
         # --- Deserialize the payload -------------------------------------------------
         try:
-            pl = payload_mod.deserialize(payload_bytes)
+            pl = extraction.decode_payload(frame)
             outcome.payload_parsed = True
         except FrameError as exc:
             outcome.payload_parsed = False
-            outcome.error = str(exc)
-            return _give_up(outcome, start)
+            return _give_up(outcome, start, detail=str(exc))
 
         # --- 5. Signature ------------------------------------------------------------
         try:
