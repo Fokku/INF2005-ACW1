@@ -34,11 +34,44 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from math import gcd
+from numbers import Integral
 
 from . import container, lsb
 from .errors import CapacityError
 
-MAX_COUNTER = 64  # give up after this many derivation attempts
+MAX_SCAN_POSITIONS = 200_000
+
+
+def _require_integer(value: int, name: str, minimum: int) -> None:
+    if isinstance(value, bool) or not isinstance(value, Integral) or value < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {value!r}")
+
+
+def _required_elements(n_elements: int, frame_bits: int, n_lsb: int) -> int:
+    _require_integer(n_elements, "n_elements", 0)
+    _require_integer(frame_bits, "frame_bits", 1)
+    _require_integer(n_lsb, "n_lsb", 1)
+    if n_lsb > 8:
+        raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
+    return -(-frame_bits // n_lsb)
+
+
+def validate_start(n_elements: int, start: int, frame_bits: int, n_lsb: int) -> None:
+    """FR7: require a nonnegative element index with room for the whole frame.
+
+    The final valid offset is n_elements - ceil(frame_bits / n_lsb), inclusive.
+    Invalid numbers raise ValueError; insufficient remaining room raises
+    CapacityError. The caller must use the actual frame size when protecting.
+    """
+    _require_integer(start, "start", 0)
+    needed = _required_elements(n_elements, frame_bits, n_lsb)
+    if start + needed > n_elements:
+        raise CapacityError(
+            f"start {start} needs {needed} elements at n_lsb={n_lsb}, but only "
+            f"{max(0, n_elements - start)} elements are remaining; "
+            f"cover has {n_elements} elements"
+        )
 
 
 def derive_start(
@@ -51,9 +84,10 @@ def derive_start(
 ) -> int:
     """Deterministically choose a start element index.
 
-    The frame must fit between the start and the end of the cover, so the
-    modulus is (usable elements - elements the frame needs), and the counter is
-    incremented until a candidate fits.
+    Keep the original HMAC message (counter zero) and modulus for compatibility
+    with existing stego files. If the reservation exactly fills the cover,
+    zero is the only valid start. Otherwise the legacy formula excludes the
+    last fitting offset; explicit mode can still select that offset.
 
     >>> WHY `frame_bits` HERE IS NOT THE TRUE FRAME SIZE: the verifier calls
     >>> this function BEFORE it has read anything, so it cannot know the real
@@ -65,32 +99,32 @@ def derive_start(
     >>> length. This confines the derived start to (roughly) the first 10% of
     >>> the cover, which guarantees at least the other 90% as trailing room for
     >>> the real frame. `pipeline.protect` still separately checks the FULL frame
-    >>> fits via `lsb.embed_bits`'s own capacity check (an unusually large
+    >>> fits via `validate_start` before embedding (an unusually large
     >>> custom payload can still legitimately exceed the reserve and raise
     >>> CapacityError), and `pipeline.verify` learns the true payload/signature
     >>> lengths by reading the header it finds at that offset.
     """
-    needed = -(-frame_bits // n_lsb)  # ceil division
+    needed = _required_elements(n_elements, frame_bits, n_lsb)
+    if not isinstance(k_loc, (bytes, bytearray)) or not k_loc:
+        raise ValueError("k_loc must be a nonempty byte key")
     span = n_elements - needed
-    if span <= 0:
+    if span < 0:
         raise CapacityError(
             f"cover has only {n_elements} elements, not enough room for a "
-            f"{needed}-element header at n_lsb={n_lsb}"
+            f"{needed}-element reservation at n_lsb={n_lsb}"
         )
+    if span == 0:
+        return 0
 
-    for counter in range(MAX_COUNTER):
-        msg = (
-            b"start"
-            + media_id.encode("utf-8")
-            + cover_kind.encode("utf-8")
-            + bytes([n_lsb])
-            + counter.to_bytes(4, "big")
-        )
-        digest = hmac.new(k_loc, msg, hashlib.sha256).digest()
-        start = int.from_bytes(digest, "big") % span
-        return start  # every candidate fits by construction of `span`
-
-    raise CapacityError(f"could not derive a start location in {MAX_COUNTER} attempts")  # pragma: no cover
+    msg = (
+        b"start"
+        + media_id.encode("utf-8")
+        + cover_kind.encode("utf-8")
+        + bytes([n_lsb])
+        + (0).to_bytes(4, "big")
+    )
+    digest = hmac.new(k_loc, msg, hashlib.sha256).digest()
+    return int.from_bytes(digest, "big") % span
 
 
 def reserved_frame_bits(n_elements: int, n_lsb: int) -> int:
@@ -101,43 +135,54 @@ def reserved_frame_bits(n_elements: int, n_lsb: int) -> int:
     not the true frame size, which only protect knows in advance. Confines the
     derived start to (roughly) the first 10% of the cover, guaranteeing at
     least the other 90% of raw capacity as trailing room for whatever frame
-    actually gets embedded — comfortable headroom for any message that also
-    passes the blanket "does it fit at all" capacity check in pipeline.protect.
+    actually gets embedded. A frame larger than the reservation may still fit,
+    but must pass the separate check against space after the derived offset.
     """
+    _require_integer(n_elements, "n_elements", 0)
+    _require_integer(n_lsb, "n_lsb", 1)
     capacity_bits = lsb.capacity_bits(n_elements, n_lsb)
     return capacity_bits - capacity_bits // 10
 
 
-def scan_for_magic(elements, n_lsb: int, max_positions: int = 200_000) -> int | None:
-    """Bounded search for the frame MAGIC anywhere in the LSB plane.
+def scan_for_magic(elements, n_lsb: int, max_positions: int = MAX_SCAN_POSITIONS) -> int | None:
+    """Return the earliest element-aligned MAGIC in a bounded LSB search.
 
-    This is what makes `Wrong Start Location` and `Payload Missing` different
-    verdicts:
+    `max_positions` counts candidate starts, from zero up to but excluding
+    that limit. Read enough trailing elements to test the final candidate's
+    complete magic. A marker at a bit position between elements is not a hit.
 
-        magic not at the expected start, but found elsewhere -> Wrong Start Location
-        magic nowhere in the cover                           -> Payload Missing
+    Search at most eight byte alignments of one extracted bit stream. This
+    finds every possible element alignment without a Python loop per element.
+    Returning None means no magic in the searched prefix at this LSB count;
+    it does NOT prove the rest of a larger cover is empty. pipeline.verify
+    reports an incomplete scan through its existing Cannot Verify interface.
 
-    Returns the element index where MAGIC was found, or None.
-
-    Extracts the LSB plane once (capped at `max_positions` elements so a 50 MB
-    WAV cannot hang the request), packs it to bytes, and searches for MAGIC.
-    A frame can start at any ELEMENT, but this byte-aligned search over the
-    packed stream only finds frames whose start is a multiple of 8/gcd(8, n_lsb)
-    elements — good enough for the demo; documented as a known limitation.
+    Magic is only a location hint, not proof of a valid or authentic payload.
+    A found marker does not authorize automatic extraction from that offset.
     """
+    _require_integer(n_lsb, "n_lsb", 1)
     if not 1 <= n_lsb <= 8:
         raise ValueError(f"n_lsb must be 1..8, got {n_lsb}")
+    _require_integer(max_positions, "max_positions", 0)
 
-    n_elements = min(len(elements), max_positions)
-    n_bits = (n_elements * n_lsb // 8) * 8  # round down to a whole number of bytes
-    if n_bits <= 0:
+    magic_bits = len(container.MAGIC) * 8
+    magic_elements = -(-magic_bits // n_lsb)
+    positions = min(max_positions, max(0, len(elements) - magic_elements + 1))
+    if positions == 0:
         return None
 
+    n_bits = (positions - 1) * n_lsb + magic_bits
     bits = lsb.extract_bits(elements, 0, n_bits, n_lsb)
-    packed = lsb.bits_to_bytes(bits)
-    byte_index = packed.find(container.MAGIC)
-    if byte_index == -1:
-        return None
-
-    bit_index = byte_index * 8
-    return bit_index // n_lsb
+    earliest = None
+    for shift in range(0, 8, gcd(8, n_lsb)):
+        byte_bits = ((len(bits) - shift) // 8) * 8
+        packed = lsb.bits_to_bytes(bits[shift : shift + byte_bits])
+        byte_index = packed.find(container.MAGIC)
+        while byte_index != -1:
+            bit_index = shift + byte_index * 8
+            if bit_index % n_lsb == 0:
+                start = bit_index // n_lsb
+                earliest = start if earliest is None else min(earliest, start)
+                break  # later hits in this alignment cannot be earlier
+            byte_index = packed.find(container.MAGIC, byte_index + 1)
+    return earliest

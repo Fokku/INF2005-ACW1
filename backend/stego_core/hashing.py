@@ -19,6 +19,8 @@ import json
 
 import numpy as np
 
+_LOWER_HEX = frozenset("0123456789abcdef")
+
 
 def sha256_hex(data: bytes) -> str:
     """Plain SHA-256 of raw bytes, lowercase hex. Used for the file-level
@@ -27,6 +29,16 @@ def sha256_hex(data: bytes) -> str:
     Done for you.
     """
     return hashlib.sha256(data).hexdigest()
+
+
+def is_sha256_hex_digest(value: object) -> bool:
+    """Return whether *value* is a canonical lowercase SHA-256 digest.
+
+    The payload carries the digest as text. Enforcing the exact representation
+    at its trust boundary prevents malformed or ambiguous values from reaching
+    FR9 comparison and API reporting.
+    """
+    return isinstance(value, str) and len(value) == 64 and all(char in _LOWER_HEX for char in value)
 
 
 def stable_media_hash(elements: np.ndarray, n_lsb: int, header_fields: dict[str, int | str]) -> str:

@@ -78,6 +78,8 @@ def parse_frame(data: bytes) -> tuple[bytes, bytes, int, bool]:
     total = HEADER_SIZE + payload_len + sig_len + CRC_SIZE
     if len(data) < total:
         raise FrameError(f"frame truncated: need {total} bytes, have {len(data)}")
+    if len(data) > total:
+        raise FrameError(f"frame has trailing bytes: expected {total} bytes, have {len(data)}")
 
     body = data[: HEADER_SIZE + payload_len + sig_len]
     (crc_stored,) = _CRC_STRUCT.unpack_from(data, HEADER_SIZE + payload_len + sig_len)
@@ -106,6 +108,10 @@ def parse_header(data: bytes) -> tuple[int, int, int, bool]:
         raise FrameError(f"unsupported frame version: {version}")
     if not 1 <= n_lsb <= 8:
         raise FrameError(f"frame header claims impossible n_lsb: {n_lsb}")
+    if flags & ~FLAG_ENCRYPTED:
+        raise FrameError(f"frame header contains unsupported flags: {flags:#04x}")
+    if payload_len == 0 or sig_len == 0:
+        raise FrameError("frame must contain a payload and a signature")
 
     encrypted = bool(flags & FLAG_ENCRYPTED)
     return payload_len, sig_len, n_lsb, encrypted

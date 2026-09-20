@@ -44,6 +44,9 @@ async def verify(
     and a corrupted frame are all normal outcomes with their own verdict. Only
     a genuinely broken request (no file at all) is an HTTP error.
     """
+    if start_mode == StartMode.explicit and explicit_start is None:
+        raise HTTPException(status_code=400, detail="explicit start mode requires an explicit_start offset")
+
     stego_bytes = await stego.read()
 
     try:

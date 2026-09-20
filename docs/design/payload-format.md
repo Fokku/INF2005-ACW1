@@ -52,8 +52,15 @@ in bytes so the capacity numbers in the UI can be explained.
 
 ## 3. What exactly is hashed
 
-TODO(team): write out the stable-representation formula and explain **why** it is not the file
-bytes. This is the single most likely question a marker will ask.
+FR9 hashes a stable representation rather than the encoded file bytes:
+
+```text
+SHA-256(canonical_json(actual_format_fields) || masked_element_bytes)
+```
+
+The low `n_lsb` carrier bits are cleared before hashing so valid embedding does not invalidate the
+digest. The full algorithm, verification sequence, tests, and important masking limitations are in
+[FR9: Hash verification](hash-verification.md).
 
 ## 4. Why the parameters are signed
 
