@@ -27,18 +27,6 @@ def test_attack_kinds_listed() -> None:
     assert {"flip_bits", "lsb_scrub", "replay"} <= kinds
 
 
-def test_unimplemented_endpoints_say_so(png_rgb: bytes) -> None:
-    """Endpoints whose core is still unimplemented (attacks.py, workstream F)
-    return a helpful 501 rather than crashing."""
-    r = client.post(
-        "/api/attack",
-        files={"stego": ("t.png", png_rgb, "image/png")},
-        data={"attack": "flip_bits", "n_lsb": "1", "start_offset": "0"},
-    )
-    assert r.status_code == 501
-    assert r.json()["error"] == "not_implemented"
-
-
 def test_capacity_accounts_for_base64_inflation(png_rgb: bytes) -> None:
     """A message goes into the signed payload as base64 (payload.py's
     message_b64 field), which costs ~4/3 its raw size, not 1x. For a large

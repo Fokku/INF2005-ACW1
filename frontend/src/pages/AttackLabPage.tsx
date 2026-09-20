@@ -16,7 +16,7 @@ import type { AttackKind, AttackKindInfo, AttackResult } from '../types'
  * innovation. Generating them here makes them reproducible: press a button, get
  * a damaged file, take it to the Verify tab, watch the verdict change.
  *
- * The page is COMPLETE — the attack list already comes from the backend.
+ * Attack descriptions and conditional verdict predictions come from the backend.
  */
 export function AttackLabPage() {
   const [kinds, setKinds] = useState<AttackKindInfo[]>([])
@@ -62,7 +62,9 @@ export function AttackLabPage() {
         <span className="text-base-content font-medium">This tab manufactures failures on purpose.</span>{' '}
         Each attack damages a protected file in a specific way. Take the result to the Verify tab
         and check that the verdict matches the prediction — that is the evidence the negative cases
-        actually work.
+        actually work. Predictions assume the original settings; cropping and re-encoding may produce
+        a different failure if the embedded frame is lost.
+        {' '}A large file may report Cannot Verify when the payload search reaches its limit.
       </p>
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
@@ -70,7 +72,7 @@ export function AttackLabPage() {
           <FilePicker
             label="A protected stego file"
             accept=".png,.wav,.avi"
-            hint="output from the Protect tab"
+            hint="Output from Protect. AVI supports all attacks except crop."
             file={stego}
             onChange={setStego}
           />
@@ -95,6 +97,11 @@ export function AttackLabPage() {
               />
             </Field>
           </div>
+          <p className="text-xs text-base-content/70">
+            Copy the LSB count and start offset from Protect. For verification, use the original
+            media ID and public key. After crop or replay, select explicit start mode and enter
+            the original offset because the cover size may have changed.
+          </p>
           <FilePicker
             label="Second cover (replay attack only)"
             accept=".png,.wav,.avi"
@@ -113,7 +120,7 @@ export function AttackLabPage() {
                 <button
                   key={kind.kind}
                   type="button"
-                  disabled={!stego || busy}
+                  disabled={!stego || busy || (kind.kind === 'replay' && !otherCover)}
                   onClick={() => void onRun(kind.kind)}
                   className={`flex flex-col items-start gap-2 rounded-sm border p-3 text-left transition-colors ${
                     selected === kind.kind
@@ -138,9 +145,10 @@ export function AttackLabPage() {
               <div className="border-verdict-authentic bg-verdict-authentic/10 rounded-sm border p-4 text-sm">
                 <p className="font-medium">Damaged copy created</p>
                 <p className="mt-1 text-base-content/70">
-                  Verify it and expect <strong className="text-base-content">{result.expected_verdict}</strong>.
+                  Predicted verdict: <strong className="text-base-content">{result.expected_verdict}</strong>.
                 </p>
               </div>
+              <p className="text-sm text-base-content/70">{result.description}</p>
               <DownloadButton file={result.output} label="Tampered file" />
             </>
           )}

@@ -1,0 +1,26 @@
+{
+  "method": "Automated API replay and pipeline verification; not a manual GUI replay run",
+  "source": "User-protected wav-sample-5s.stego.wav, identified by its screenshot SHA-256",
+  "target": "Independent unprotected 5-second mono 16-bit PCM 660 Hz tone, 44100 Hz",
+  "settings": {
+    "media_id": "kannan-audio-test",
+    "n_lsb": 2,
+    "explicit_start": 0
+  },
+  "source_verdict": "Authentic",
+  "target_frame_at_offset_zero": false,
+  "replay_verdict": "Tampered",
+  "signature_valid": true,
+  "media_hash_embedded": "f4a58a290da3f754f053b01f901d525ae491b798f67d2f414af100b09cad8bff",
+  "media_hash_recomputed": "25499eac15df149546bcca8785591ba2c10ecdbe138e23e23486c907451a0bf8",
+  "reasons": [
+    "the recomputed media hash does not match the hash signed into the payload"
+  ],
+  "signed_frame_unchanged": true,
+  "sha256": {
+    "samples/audio/original/section-f-replay-target.wav": "edd2f5bd1b080f6f34d0b53a1a77c84a000dabad2cca16724548da1c9975698b",
+    "samples/audio/stego/section-f-replay-source.wav": "02cf6103d4766bdff09e9504273d989fe524f0051911103507e0ee5ecfdbba5f",
+    "samples/audio/tampered/section-f-replay.wav": "28a02aa5e906f2df9ec7d314a67498e4c7de8fd774b8e6ce7b66b1fa4eb0bbbf",
+    "keys/public/section-f-demo.pub.pem": "77e8abf0513a41e3cd9684c1b2d329afde8ac8f9783c7c03053cbc96f921a4ec"
+  }
+}
