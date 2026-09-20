@@ -135,22 +135,18 @@ def test_verify_api_reports_embedded_and_recomputed_hashes_separately(
 
 
 @pytest.mark.parametrize("kind", ["image", "audio"])
-def test_signed_payload_with_noncanonical_hash_is_rejected_cleanly(
-    kind, png_rgb, wav_16_stereo, hash_keys
-):
+def test_signed_payload_with_noncanonical_hash_is_rejected_cleanly(kind, png_rgb, wav_16_stereo, hash_keys):
     options = _protect_options(kind, "explicit", png_rgb, wav_16_stereo, hash_keys[0])
     protected = pipeline.protect(options)
     fields = {**protected.payload_json, "media_hash": "A" * 64}
-    payload_bytes = json.dumps(
-        fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    payload_bytes = json.dumps(fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
     signature = signing.sign(hash_keys[0], payload_bytes)
     frame = container.build_frame(payload_bytes, signature, options.n_lsb, False)
     load, save = _codecs(kind)
     cover = load(protected.stego_bytes)
-    elements = lsb.embed_bits(
-        cover.elements, lsb.bytes_to_bits(frame), protected.start_offset, options.n_lsb
-    )
+    elements = lsb.embed_bits(cover.elements, lsb.bytes_to_bits(frame), protected.start_offset, options.n_lsb)
 
     verified = pipeline.verify(_verify_options(options, save(cover, elements), hash_keys[1]))
 

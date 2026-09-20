@@ -18,10 +18,7 @@ AUDIO_HEADER = {"kind": "audio", "rate": 44100, "channels": 2, "width": 2}
 
 def test_sha256_hex_known_vector() -> None:
     """Use the standard SHA-256 digest for ``abc`` as an independent oracle."""
-    assert hashing.sha256_hex(b"abc") == (
-        "ba7816bf8f01cfea414140de5dae2223"
-        "b00361a396177a9cb410ff61f20015ad"
-    )
+    assert hashing.sha256_hex(b"abc") == ("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
 
 
 @pytest.mark.parametrize("digest", ["0" * 64, "0123456789abcdef" * 4])
