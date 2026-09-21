@@ -159,19 +159,21 @@ declaration remain with H/I. CLI commands remain with E.
 
 ## G · Design documents — `docs/design/`
 
-Owner: ______
+Owner: Kannon (remaining system design documents); Ridwan (FR7–FR9 documents)
 
-Can start now. These are what the demo explanation is read from.
+Technical documents are complete. Personal AI-use confirmations remain a team action before submission.
 
-- [ ] `payload-format.md` — payload fields, the frame layout, the exact hash formula
+- [x] `payload-format.md` — payload fields, the frame layout, the exact hash formula
 - [x] `start-location.md` — FR7 selection, recovery, validation, and security limits (Ridwan)
 - [x] `extraction.md` — FR8 bounded extraction, decoding, failure mapping, and limits (Ridwan)
 - [x] `fr7-fr8-contributions.md` — scoped ownership, test record, and AI-use note (Ridwan)
 - [x] `hash-verification.md` — FR9 formula, workflow, test record, and limitations (Ridwan support)
-- [ ] `verdict-table.md` — each verdict, its trigger condition, and the test that proves it
-- [ ] `threat-model.md` — what the design defends against, and what it does not
-- [ ] `limitations-and-ai-use.md` — honest limits (magic bytes are scannable, LSB is fragile and
-      detectable by steganalysis) plus how the team used and checked AI tools
+- [x] `verdict-table.md` — each verdict, its trigger condition, and the test that proves it
+- [x] `threat-model.md` — what the design defends against, and what it does not
+- [x] `limitations-and-ai-use.md` — honest limits (magic bytes are scannable, LSB is fragile and
+      detectable by steganalysis) plus recorded AI assistance and checks (Kannon)
+- [ ] Each member confirms their AI-use disclosure and reconciles it with the final declaration;
+      see the confirmation checklist in `limitations-and-ai-use.md`
 
 ## H · Samples, evidence and test cases — `samples/`, `evidence/`, `scripts/make_samples.py`
 
