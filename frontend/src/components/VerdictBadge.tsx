@@ -51,11 +51,11 @@ const VERDICT_STYLE: Record<Verdict, { text: string; bg: string; border: string;
 
 const VERDICT_SENTENCE: Record<Verdict, string> = {
   Authentic: 'Hash and signature match. Nothing has changed since protection.',
-  Tampered: 'Signature is valid, but the media no longer matches its recorded hash.',
+  Tampered: 'The embedded data is damaged, or the media does not match its signed information. See the checks below.',
   'Signature Invalid': 'Payload found, but the signature does not verify against this public key.',
   'Payload Missing': 'No embedded payload found anywhere in this file.',
   'Wrong Start Location': 'A payload exists, but not at the location this key/offset derives.',
-  'Cannot Verify': 'This file or key could not be processed — see the detail below.',
+  'Cannot Verify': 'Verification could not reach a conclusion — see the detail below.',
 }
 
 export function VerdictBadge({ verdict, reasons }: { verdict: Verdict; reasons?: string[] }) {

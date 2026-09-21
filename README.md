@@ -5,9 +5,11 @@ A GUI-based **LSB-replacement steganography** tool that protects a PNG image and
 
 > **Status: core pipeline working.** The web UI, the API, and the full protect → verify round trip
 > (LSB embed/extract, hashing, Ed25519 signing, start-location derivation, all six verdicts) work
-> end to end for image, audio, and video covers — 459/459 backend tests green. What's left is the
-> Attack Lab backend (`stego_core/attacks.py`, `/api/attack` still answers `501`), the `stego` CLI
-> commands, the remaining team-wide `docs/design/` files, and `scripts/make_samples.py` / `evidence/`.
+> end to end for image, audio, and video covers — 597/597 backend tests green. The Attack Lab
+> implements six PNG/WAV attacks, plus five AVI audio-track attacks (AVI crop is unsupported).
+> See [the Attack Lab design and demo guide](docs/design/attack-lab.md) for verdict conditions.
+> What's left is the `stego` CLI, the remaining team-wide `docs/design/` files, and
+> `scripts/make_samples.py` / `evidence/`.
 > See [TODO.md](TODO.md) for the nine workstreams and [TECH_STACK.md](TECH_STACK.md) for the stack.
 >
 > Find your work with: `grep -rn "TODO(team)" backend frontend scripts`

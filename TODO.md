@@ -89,7 +89,7 @@ from shape directly.
 
 ## E · End-to-end pipeline and API — `pipeline.py`, `app/routers/*`, `cli.py`
 
-Owner: Zong Han (pipeline + capacity/protect/verify routers done; attack router and CLI still open)
+Owner: Zong Han (pipeline + capacity/protect/verify routers done); Kannon (attack router done). CLI still open.
 
 Do this after A–D. It is mostly plumbing.
 
@@ -98,14 +98,14 @@ Do this after A–D. It is mostly plumbing.
 - [x] `pipeline.verify` — resolve start, parse, check signature, recompute hash, decide
       (image, audio, and video covers)
 - [x] `capacity`, `protect`, `verify`, `keys` routers wired to the real pipeline/`signing` functions
-- [ ] `attack` router / `attacks.py` — still stubbed, see workstream F
+- [x] `attack` router / `attacks.py` — Kannon, see workstream F
 - [ ] Fill in the `stego` CLI commands: `keygen`, `capacity`, `protect`, `verify`, `tamper`
       (`stego_core/cli.py` — every command still `raise NotImplementedError`)
 - [x] Make `tests/test_api.py::test_protect_then_verify_roundtrip` pass for image and audio
 
-The frontend needs no changes — it already calls all of these correctly. Full backend suite is
-459/459 green after the focused FR7-FR9 additions (`.venv/bin/python -m pytest -q backend/tests`);
-the only thing left producing a `501 not_implemented` at the API level is `/api/attack`.
+Full backend suite is 597/597 green after Section F (`cd backend && python -m pytest -q`).
+The Attack Lab route now produces downloadable altered files; its UI explains conditional
+verdict predictions and the original verification settings to use.
 
 ### FR7/FR8 assigned contribution — Ridwan (done)
 
@@ -139,17 +139,23 @@ final team ownership statement remain outside this contribution.
 
 ## F · Attack lab and innovation — `attacks.py`
 
-Owner: ______
+Owner: Kannon (done — `kannan_features`)
 
-The Attack Lab UI and the backend route already exist. Only the six functions are missing.
+Implemented on top of Ridwan's merged FR7–FR9 work, using the shared bounded frame extractor.
 
-- [ ] `flip_bits`, `crop`, `lsb_scrub`, `reencode`, `corrupt_payload`, `replay`
-- [ ] Confirm each one produces the verdict `attacks.EXPECTED` predicts
-- [ ] Write up the innovation claim: what it is, why it is useful, what it does not solve
+- [x] `flip_bits`, `crop`, `lsb_scrub`, `reencode`, `corrupt_payload`, `replay` for PNG/WAV
+- [x] Wire `/api/attack`, validate inputs and return named downloads; update GUI guidance
+- [x] Confirm `attacks.EXPECTED` under documented demo conditions — 139 Section F tests,
+      including real verification and API downloads; full backend suite 597/597 green
+- [x] Write up innovation, demo steps, limitations and AI-use record in `docs/design/attack-lab.md`
+- [x] Archive 14 manual PNG/WAV result screenshots and an independent-target WAV replay
+      API check, with public key, reproducible samples and logs in `evidence/section-f.md`
 
-Innovation candidates (pick one and justify it): the keyed start-location derivation, the attack
-simulation module, an encrypted payload, or something from spec Section 8. **Do not start this
-until `test_verdicts.py` is green** — criteria 2 and 3 are worth 19 marks, this one is worth 4.
+The innovation is the reproducible attack simulation workflow. Cropping/re-encoding have
+conditional outcomes, explained in the GUI and design note (including Cannot Verify after an incomplete large-cover search). AVI supports the five equal-length
+PCM transformations; cropping AVI is explicitly rejected. Section F evidence is saved;
+team-wide sample curation, the email transfer, timed rehearsal and final contribution
+declaration remain with H/I. CLI commands remain with E.
 
 ## G · Design documents — `docs/design/`
 

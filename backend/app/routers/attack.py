@@ -1,39 +1,23 @@
-"""Attack Lab: generate the negative test cases on demand.
+"""Generate controlled negative verification cases for the Attack Lab."""
 
-The spec needs at least three negative cases (Section 5) and lists an "attack
-simulation module" as a candidate innovation (Section 8). Doing it in the GUI
-makes the demo reproducible: press a button, get a tampered file, verify it,
-watch the verdict change.
-"""
+from pathlib import Path
 
-from __future__ import annotations
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from fastapi import APIRouter, File, Form, UploadFile
+from stego_core import attacks
 
-from stego_core.attacks import EXPECTED
-
-from ..schemas import AttackKind, AttackResult
+from .. import storage
+from ..schemas import AttackKind, AttackResult, FileRef
+from .capacity import _decode_cover, _sniff_kind
 
 router = APIRouter()
 
 
 @router.get("/attack/kinds")
 async def kinds() -> list[dict[str, str]]:
-    """List the available attacks and the verdict each one should produce.
-
-    Complete — no TODO. The UI uses this to build the Attack Lab buttons, so the
-    list stays in sync with `stego_core.attacks.EXPECTED` automatically.
-    """
-    labels = {
-        "flip_bits": "Flip high bits in a region (visible/audible edit)",
-        "crop": "Crop the image / truncate the audio",
-        "lsb_scrub": "Zero the LSB plane (looks and sounds identical)",
-        "reencode": "Re-encode via JPEG / resample the audio",
-        "corrupt_payload": "Flip bits inside the embedded frame",
-        "replay": "Transplant the frame into a different cover",
-    }
     return [
-        {"kind": k, "expected_verdict": v.value, "description": labels.get(k, k)} for k, v in EXPECTED.items()
+        {"kind": key, "expected_verdict": verdict.value, "description": attacks.DESCRIPTIONS[key]}
+        for key, verdict in attacks.EXPECTED.items()
     ]
 
 
@@ -42,19 +26,39 @@ async def run_attack(
     stego: UploadFile = File(...),
     attack: AttackKind = Form(...),
     n_lsb: int = Form(1, ge=1, le=8),
-    start_offset: int = Form(0),
-    other_cover: UploadFile | None = File(None, description="target cover for the replay attack"),
+    start_offset: int = Form(0, ge=0),
+    other_cover: UploadFile | None = File(None),
 ) -> AttackResult:
-    """Damage a stego file in a controlled way and return the result.
-
-    TODO(team): implement.
-
-    Steps:
-      1. Read the upload and sniff the cover kind.
-      2. Dispatch to the matching function in stego_core.attacks.
-      3. storage.save() the damaged file with a name that says what happened
-         (e.g. "lena.stego.flip_bits.png") — these files go into samples/tampered/.
-      4. Return AttackResult with EXPECTED[attack] as expected_verdict, so the
-         demo can state the prediction before running Verify.
-    """
-    raise NotImplementedError("TODO(team): app/routers/attack.py::run_attack")
+    kind = _sniff_kind(stego.filename or "")
+    data = await stego.read()
+    name = attack.value
+    try:
+        if attack == AttackKind.flip_bits:
+            cover = _decode_cover(kind, data)
+            if n_lsb >= cover.elements.dtype.itemsize * 8:
+                raise ValueError("no high bits remain outside the LSB plane; use fewer LSBs for this demo")
+            output = attacks.flip_bits(data, kind.value)
+        elif attack == AttackKind.crop:
+            output = attacks.crop(data, kind.value)
+        elif attack == AttackKind.lsb_scrub:
+            output = attacks.lsb_scrub(data, kind.value, n_lsb)
+        elif attack == AttackKind.reencode:
+            output = attacks.reencode(data, kind.value)
+        elif attack == AttackKind.corrupt_payload:
+            output = attacks.corrupt_payload(data, kind.value, n_lsb, start_offset)
+        else:
+            if other_cover is None:
+                raise ValueError("a second cover is required for replay")
+            if _sniff_kind(other_cover.filename or "") != kind:
+                raise ValueError("replay target must have the same cover kind")
+            output = attacks.replay(data, await other_cover.read(), kind.value, n_lsb, start_offset)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    suffix = {"image": ".png", "audio": ".wav", "video": ".avi"}[kind.value]
+    filename = f"{Path(stego.filename or 'cover').stem}.{name}{suffix}"
+    return AttackResult(
+        attack=attack,
+        description=attacks.DESCRIPTIONS[name],
+        expected_verdict=attacks.EXPECTED[name],
+        output=FileRef(**storage.save(output, filename)),
+    )
