@@ -1,0 +1,816 @@
+{
+  "generated_at": "2026-09-22T11:24:04.222446+00:00",
+  "method": "Automated in-process FastAPI requests, not external transfer or GUI screenshots",
+  "external_transfer": "PENDING",
+  "checks": [
+    {
+      "case": "image-short",
+      "message_bytes": 105,
+      "frame_bytes": 632,
+      "report": {
+        "verdict": "Authentic",
+        "reasons": [
+          "signature valid, media hash matches, parameters match the signed payload"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-short.stego.png",
+          "size_bytes": 2801,
+          "sha256": "14d5640990b63f8fad5ac8df9306844a2f9f8ffa79e1373f0040b3f77674822a",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+        "media_hash_recomputed": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+        "hash_match": true,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-image-short",
+          "timestamp": "2026-09-22T11:24:04.228655+00:00",
+          "cover_kind": "image",
+          "n_lsb": 2,
+          "shape": [
+            256,
+            256,
+            3
+          ],
+          "media_hash": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+          "nonce": "dc08a09492f4b9ca5cfd7cb94aa86dd9",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": false,
+          "message_text": "Explain how steganography can be used to embed hidden verification data in image and audio cover objects.",
+          "message_file": null
+        }
+      },
+      "message_exact": true
+    },
+    {
+      "case": "image-Signature Invalid",
+      "report": {
+        "verdict": "Signature Invalid",
+        "reasons": [
+          "the digital signature does not verify against the supplied public key \u2014 wrong key, or the signed payload was altered"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-short.stego.png",
+          "size_bytes": 2801,
+          "sha256": "14d5640990b63f8fad5ac8df9306844a2f9f8ffa79e1373f0040b3f77674822a",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": false,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "image-Wrong Start Location",
+      "report": {
+        "verdict": "Wrong Start Location",
+        "reasons": [
+          "payload magic was not found at the expected start location, but was found elsewhere in the cover \u2014 check the passphrase / explicit start offset"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-short.stego.png",
+          "size_bytes": 2801,
+          "sha256": "14d5640990b63f8fad5ac8df9306844a2f9f8ffa79e1373f0040b3f77674822a",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 0,
+        "payload_found": true,
+        "signature_valid": null,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "image-Cannot Verify",
+      "report": {
+        "verdict": "Cannot Verify",
+        "reasons": [
+          "malformed public key: Unable to load PEM file. See https://cryptography.io/en/latest/faq/#why-can-t-i-import-my-pem-file for more details. MalformedFraming"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-short.stego.png",
+          "size_bytes": 2801,
+          "sha256": "14d5640990b63f8fad5ac8df9306844a2f9f8ffa79e1373f0040b3f77674822a",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": false,
+        "signature_valid": null,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "image-flip_bits",
+      "report": {
+        "verdict": "Tampered",
+        "reasons": [
+          "the recomputed media hash does not match the hash signed into the payload"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-flip_bits.png",
+          "size_bytes": 2979,
+          "sha256": "4df6efeddc8c5bd94ca2471cf16b78e44b23411a7b7198e6949cc2f6220a665d",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+        "media_hash_recomputed": "2ebf602e72d5f09c0b261107fad091e63ef9c669747403df204ce2e6650de2f6",
+        "hash_match": false,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-image-short",
+          "timestamp": "2026-09-22T11:24:04.228655+00:00",
+          "cover_kind": "image",
+          "n_lsb": 2,
+          "shape": [
+            256,
+            256,
+            3
+          ],
+          "media_hash": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+          "nonce": "dc08a09492f4b9ca5cfd7cb94aa86dd9",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": false,
+          "message_text": "Explain how steganography can be used to embed hidden verification data in image and audio cover objects.",
+          "message_file": null
+        }
+      }
+    },
+    {
+      "case": "image-lsb_scrub",
+      "report": {
+        "verdict": "Payload Missing",
+        "reasons": [
+          "no embedded payload could be found anywhere in this cover \u2014 it may never have been protected, or the LSB plane was destroyed by re-encoding"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-lsb_scrub.png",
+          "size_bytes": 1793,
+          "sha256": "ed708049d58c9025955666a89caaf471d48956eeb21367d03879f28a148c8dc4",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": false,
+        "signature_valid": null,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "image-oversized",
+      "capacity": {
+        "cover": {
+          "kind": "image",
+          "filename": "original.png",
+          "size_bytes": 1389,
+          "sha256": "a0b9f6a06e1696514a46bf9ee3a7daeca4b50183db1a38d15a281627051b70e8",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "total_elements": 196608,
+        "capacity_bits": 393216,
+        "capacity_bytes": 49152,
+        "frame_overhead_bytes": 33717,
+        "max_message_bytes": 36578,
+        "payload_bytes": 100000,
+        "fits": false
+      },
+      "protect_error": {
+        "error": "capacity_exceeded",
+        "detail": "payload does not fit: the frame needs 133828 bytes (1070624 bits) at n_lsb=2, but this cover only has capacity for 49152 bytes"
+      }
+    },
+    {
+      "case": "image-large",
+      "message_bytes": 673,
+      "frame_bytes": 1392,
+      "report": {
+        "verdict": "Authentic",
+        "reasons": [
+          "signature valid, media hash matches, parameters match the signed payload"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-large.stego.png",
+          "size_bytes": 4111,
+          "sha256": "6d97d0ea28707882c8e603fd86888412998b5c1dc22b30f819e8ef5bfee77810",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+        "media_hash_recomputed": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+        "hash_match": true,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-image-large",
+          "timestamp": "2026-09-22T11:24:04.258406+00:00",
+          "cover_kind": "image",
+          "n_lsb": 2,
+          "shape": [
+            256,
+            256,
+            3
+          ],
+          "media_hash": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+          "nonce": "d2aaab9d2984aeb5117f9f86005ab20f",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": false,
+          "message_text": "This undergraduate project requires student teams to design, implement and demonstrate a GUI-based LSB Replacement steganography program (window-based or web-based) that protects and verifies both image and audio cover objects using steganography, hashing and digital signatures.\n\nThe project focuses on practical cybersecurity concepts: hiding a verification payload inside an image and an audio file, signing relevant verification data, extracting the hidden payload, checking the digital signature, and demonstrating positive and negative verification cases. Video as a cover object is not required for the main assignment, but may be attempted as an optional challenge.",
+          "message_file": null
+        }
+      },
+      "message_exact": true
+    },
+    {
+      "case": "image-custom",
+      "message_bytes": 214,
+      "frame_bytes": 816,
+      "report": {
+        "verdict": "Authentic",
+        "reasons": [
+          "signature valid, media hash matches, parameters match the signed payload"
+        ],
+        "stego": {
+          "kind": "image",
+          "filename": "image-custom.stego.png",
+          "size_bytes": 3161,
+          "sha256": "3ef0b5c0d2e63d98de9ffe664b11e2435d5cff8cfd6cb702b83ec56fd8e77ec4",
+          "image": {
+            "width": 256,
+            "height": 256,
+            "channels": 3,
+            "mode": "RGB"
+          },
+          "audio": null,
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+        "media_hash_recomputed": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+        "hash_match": true,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-image-custom",
+          "timestamp": "2026-09-22T11:24:04.422679+00:00",
+          "cover_kind": "image",
+          "n_lsb": 2,
+          "shape": [
+            256,
+            256,
+            3
+          ],
+          "media_hash": "341af4f4b56f2d20f286de4f1ed248d26836373108696d86e8c1eaa3da0cf864",
+          "nonce": "ca4f52189281b4b1a7b9775f9d9de2c3",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": true,
+          "message_text": null,
+          "message_file": {
+            "file_id": "d6b3b6ddd36f4e10b3b2b8241d73395d",
+            "filename": "message.txt",
+            "mime": "text/plain",
+            "size_bytes": 214,
+            "sha256": "b7ac0091c03e024e04588937d3716405c4719e485fe5a50eaea54ff4b220d28b",
+            "url": "/api/files/d6b3b6ddd36f4e10b3b2b8241d73395d",
+            "download_url": "/api/files/d6b3b6ddd36f4e10b3b2b8241d73395d?download=1&filename=message.txt"
+          }
+        }
+      },
+      "message_exact": true,
+      "encryption_checks": {
+        "correct_secret_recovers_exact_message": true,
+        "absent_and_wrong_secret_do_not_recover_plaintext": true
+      }
+    },
+    {
+      "case": "audio-short",
+      "message_bytes": 105,
+      "frame_bytes": 631,
+      "report": {
+        "verdict": "Authentic",
+        "reasons": [
+          "signature valid, media hash matches, parameters match the signed payload"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-short.stego.wav",
+          "size_bytes": 320044,
+          "sha256": "24026d88d4446dcd89c8015bc0f4f624492471b1ac9da531863a014cf3554989",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+        "media_hash_recomputed": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+        "hash_match": true,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-audio-short",
+          "timestamp": "2026-09-22T11:24:04.744718+00:00",
+          "cover_kind": "audio",
+          "n_lsb": 2,
+          "shape": [
+            160000,
+            1
+          ],
+          "media_hash": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+          "nonce": "a407961a6d0a02808dbd881fc8f09360",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": false,
+          "message_text": "Explain how steganography can be used to embed hidden verification data in image and audio cover objects.",
+          "message_file": null
+        }
+      },
+      "message_exact": true
+    },
+    {
+      "case": "audio-Signature Invalid",
+      "report": {
+        "verdict": "Signature Invalid",
+        "reasons": [
+          "the digital signature does not verify against the supplied public key \u2014 wrong key, or the signed payload was altered"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-short.stego.wav",
+          "size_bytes": 320044,
+          "sha256": "24026d88d4446dcd89c8015bc0f4f624492471b1ac9da531863a014cf3554989",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": false,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "audio-Wrong Start Location",
+      "report": {
+        "verdict": "Wrong Start Location",
+        "reasons": [
+          "payload magic was not found at the expected start location, but was found elsewhere in the cover \u2014 check the passphrase / explicit start offset"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-short.stego.wav",
+          "size_bytes": 320044,
+          "sha256": "24026d88d4446dcd89c8015bc0f4f624492471b1ac9da531863a014cf3554989",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 0,
+        "payload_found": true,
+        "signature_valid": null,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "audio-Cannot Verify",
+      "report": {
+        "verdict": "Cannot Verify",
+        "reasons": [
+          "malformed public key: Unable to load PEM file. See https://cryptography.io/en/latest/faq/#why-can-t-i-import-my-pem-file for more details. MalformedFraming"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-short.stego.wav",
+          "size_bytes": 320044,
+          "sha256": "24026d88d4446dcd89c8015bc0f4f624492471b1ac9da531863a014cf3554989",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": false,
+        "signature_valid": null,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "audio-flip_bits",
+      "report": {
+        "verdict": "Tampered",
+        "reasons": [
+          "the recomputed media hash does not match the hash signed into the payload"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-flip_bits.wav",
+          "size_bytes": 320044,
+          "sha256": "a5228c5d64e8f46d27dcc0e353293c0174cd78a09d7ddde1b3f4f94933a3c09c",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+        "media_hash_recomputed": "f337473cf873a51c8bbe2fa8d4c6f9a930796877aa5a61befe1802b4e0733801",
+        "hash_match": false,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-audio-short",
+          "timestamp": "2026-09-22T11:24:04.744718+00:00",
+          "cover_kind": "audio",
+          "n_lsb": 2,
+          "shape": [
+            160000,
+            1
+          ],
+          "media_hash": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+          "nonce": "a407961a6d0a02808dbd881fc8f09360",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": false,
+          "message_text": "Explain how steganography can be used to embed hidden verification data in image and audio cover objects.",
+          "message_file": null
+        }
+      }
+    },
+    {
+      "case": "audio-lsb_scrub",
+      "report": {
+        "verdict": "Payload Missing",
+        "reasons": [
+          "no embedded payload could be found anywhere in this cover \u2014 it may never have been protected, or the LSB plane was destroyed by re-encoding"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-lsb_scrub.wav",
+          "size_bytes": 320044,
+          "sha256": "45e48402976935238fe65065344b10c7ea38cb8931ad01a608e8e32d473a0288",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": false,
+        "signature_valid": null,
+        "media_hash_embedded": null,
+        "media_hash_recomputed": null,
+        "hash_match": null,
+        "payload": null
+      }
+    },
+    {
+      "case": "audio-oversized",
+      "capacity": {
+        "cover": {
+          "kind": "audio",
+          "filename": "original.wav",
+          "size_bytes": 320044,
+          "sha256": "080294b9a349f90b01d871863864f1fec2a7c95049556e2ba33f7f56c51ef452",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "total_elements": 160000,
+        "capacity_bits": 320000,
+        "capacity_bytes": 40000,
+        "frame_overhead_bytes": 33717,
+        "max_message_bytes": 29714,
+        "payload_bytes": 100000,
+        "fits": false
+      },
+      "protect_error": {
+        "error": "capacity_exceeded",
+        "detail": "payload does not fit: the frame needs 133827 bytes (1070616 bits) at n_lsb=2, but this cover only has capacity for 40000 bytes"
+      }
+    },
+    {
+      "case": "audio-large",
+      "message_bytes": 673,
+      "frame_bytes": 1391,
+      "report": {
+        "verdict": "Authentic",
+        "reasons": [
+          "signature valid, media hash matches, parameters match the signed payload"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-large.stego.wav",
+          "size_bytes": 320044,
+          "sha256": "71d8cfb7abf21a958149fff06c76c03a2b39aa369ce444617b774352bcb38e47",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+        "media_hash_recomputed": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+        "hash_match": true,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-audio-large",
+          "timestamp": "2026-09-22T11:24:04.762983+00:00",
+          "cover_kind": "audio",
+          "n_lsb": 2,
+          "shape": [
+            160000,
+            1
+          ],
+          "media_hash": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+          "nonce": "590165f3254d62b3e44951d018602e45",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": false,
+          "message_text": "This undergraduate project requires student teams to design, implement and demonstrate a GUI-based LSB Replacement steganography program (window-based or web-based) that protects and verifies both image and audio cover objects using steganography, hashing and digital signatures.\n\nThe project focuses on practical cybersecurity concepts: hiding a verification payload inside an image and an audio file, signing relevant verification data, extracting the hidden payload, checking the digital signature, and demonstrating positive and negative verification cases. Video as a cover object is not required for the main assignment, but may be attempted as an optional challenge.",
+          "message_file": null
+        }
+      },
+      "message_exact": true
+    },
+    {
+      "case": "audio-custom",
+      "message_bytes": 214,
+      "frame_bytes": 815,
+      "report": {
+        "verdict": "Authentic",
+        "reasons": [
+          "signature valid, media hash matches, parameters match the signed payload"
+        ],
+        "stego": {
+          "kind": "audio",
+          "filename": "audio-custom.stego.wav",
+          "size_bytes": 320044,
+          "sha256": "b0ecb997d686306adf7d16586e3277eca97dc8295cee29178f53d1c858f93903",
+          "image": null,
+          "audio": {
+            "sample_rate": 32000,
+            "channels": 1,
+            "sample_width_bytes": 2,
+            "frames": 160000,
+            "duration_seconds": 5.0
+          },
+          "video": null
+        },
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "start_offset_used": 64,
+        "payload_found": true,
+        "signature_valid": true,
+        "media_hash_embedded": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+        "media_hash_recomputed": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+        "hash_match": true,
+        "payload": {
+          "version": 1,
+          "media_id": "kannan-fr11-audio-custom",
+          "timestamp": "2026-09-22T11:24:04.921456+00:00",
+          "cover_kind": "audio",
+          "n_lsb": 2,
+          "shape": [
+            160000,
+            1
+          ],
+          "media_hash": "4de4af76fc328c0bf21188cf31b1bb5afb13ae0a8c239f31c054839013f5bd03",
+          "nonce": "61e693e774ef79b7fac2a8d73eb8eb87",
+          "metadata": {
+            "author": "Kannon",
+            "purpose": "FR10/FR11 synthetic demonstration"
+          },
+          "message_mime": "text/plain",
+          "message_encrypted": true,
+          "message_text": null,
+          "message_file": {
+            "file_id": "d4f4d53d84084394a5750f885539a095",
+            "filename": "message.txt",
+            "mime": "text/plain",
+            "size_bytes": 214,
+            "sha256": "b7ac0091c03e024e04588937d3716405c4719e485fe5a50eaea54ff4b220d28b",
+            "url": "/api/files/d4f4d53d84084394a5750f885539a095",
+            "download_url": "/api/files/d4f4d53d84084394a5750f885539a095?download=1&filename=message.txt"
+          }
+        }
+      },
+      "message_exact": true,
+      "encryption_checks": {
+        "correct_secret_recovers_exact_message": true,
+        "absent_and_wrong_secret_do_not_recover_plaintext": true
+      }
+    }
+  ],
+  "attachments": [
+    {
+      "filename": "image-custom.stego.png",
+      "sha256": "3ef0b5c0d2e63d98de9ffe664b11e2435d5cff8cfd6cb702b83ec56fd8e77ec4",
+      "media_id": "kannan-fr11-image-custom",
+      "expected_message_sha256": "b7ac0091c03e024e04588937d3716405c4719e485fe5a50eaea54ff4b220d28b"
+    },
+    {
+      "filename": "audio-custom.stego.wav",
+      "sha256": "b0ecb997d686306adf7d16586e3277eca97dc8295cee29178f53d1c858f93903",
+      "media_id": "kannan-fr11-audio-custom",
+      "expected_message_sha256": "b7ac0091c03e024e04588937d3716405c4719e485fe5a50eaea54ff4b220d28b"
+    }
+  ],
+  "settings": {
+    "n_lsb": 2,
+    "start_mode": "explicit",
+    "explicit_start": 64
+  },
+  "demo_passphrase": "FR11-demo-only-release-2026"
+}
