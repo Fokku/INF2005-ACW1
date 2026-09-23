@@ -43,11 +43,10 @@ export const SAMPLE_PAYLOADS: SamplePayload[] = [
     description:
       'Tick "Encrypt message" with this one. AES-256-GCM gives confidentiality, ' +
       'the signature gives integrity — together they satisfy the spec\'s custom payload.',
-    // TODO(team): replace with the note your team actually wants to demo.
-    // Keep it something a marker can see is genuinely sensitive, e.g. an
-    // embargoed release date plus an internal reference.
+    // Something a marker can see is genuinely sensitive: an embargoed release
+    // date plus an internal reference.
     text:
-      'CONFIDENTIAL — Team Px-x internal release note. Asset cleared for publication ' +
+      'CONFIDENTIAL — INF2005 ACW1 internal release note. Asset cleared for publication ' +
       'on 2026-09-30. Reviewed by the media verification team. Do not redistribute ' +
       'before the embargo date.',
   },

@@ -40,20 +40,10 @@ class AudioCover:
 def load_wav(data: bytes) -> AudioCover:
     """Decode WAV bytes into a flat unsigned array of samples.
 
-    TODO(team): implement.
-
-    Sketch:
-      with wave.open(io.BytesIO(data), "rb") as w:
-          nchannels, sampwidth, framerate, nframes = w.getparams()[:4]
-          raw = w.readframes(nframes)
-      if sampwidth not in (1, 2): raise UnsupportedCoverError(...)
-      dtype = np.uint8 if sampwidth == 1 else np.int16
-      arr = np.frombuffer(raw, dtype=dtype)
-      elements = arr if sampwidth == 1 else arr.view(np.uint16)   # <- the view
-      return AudioCover(elements.copy(), framerate, nchannels, sampwidth, nframes)
-
-    `wave` raises wave.Error for compressed/exotic files — catch it and re-raise
-    as UnsupportedCoverError with a message the GUI can show.
+    8-bit samples stay uint8. 16-bit samples are read as int16 and returned as a
+    uint16 view, so LSB operations never touch the sign. Compressed or exotic
+    files (`wave.Error`) and sample widths other than 8/16-bit raise
+    UnsupportedCoverError with a message the GUI can show.
     """
     try:
         with wave.open(io.BytesIO(data), "rb") as w:
@@ -80,14 +70,8 @@ def load_wav(data: bytes) -> AudioCover:
 def save_wav(cover: AudioCover, elements: np.ndarray) -> bytes:
     """Rebuild WAV bytes from (possibly modified) samples, preserving all params.
 
-    TODO(team): implement.
-
-    Sketch:
-      raw = elements.astype(np.uint8).tobytes() if sample_width == 1
-            else elements.view(np.int16).tobytes()
-      with wave.open(buf, "wb") as w:
-          w.setnchannels(cover.channels); w.setsampwidth(cover.sample_width)
-          w.setframerate(cover.sample_rate); w.writeframes(raw)
+    16-bit samples are viewed back as int16 before writing. Channel count,
+    sample width and sample rate are copied from the cover unchanged.
     """
     if cover.sample_width == 1:
         raw = elements.astype(np.uint8).tobytes()

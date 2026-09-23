@@ -44,7 +44,7 @@ Watch out: keep the array dtype, and never do bit operations on `int16`.
 
 ## B · Cover codecs — `image_codec.py`, `audio_codec.py`
 
-Owner: ______  ·  Owner: ______  (split image / audio between two people)
+Owner: Ke Ying (done — image and audio codecs)
 
 - [x] `load_png` / `save_png` — lossless round-trip, normalise odd modes to RGB/RGBA
 - [x] `load_wav` / `save_wav` — 8/16-bit PCM, mono and stereo, WAV header and params preserved
@@ -103,7 +103,7 @@ Do this after A–D. It is mostly plumbing.
       (`stego_core/cli.py` — every command still `raise NotImplementedError`)
 - [x] Make `tests/test_api.py::test_protect_then_verify_roundtrip` pass for image and audio
 
-Full backend suite is 597/597 green after Section F (`cd backend && python -m pytest -q`).
+Full backend suite is 629/629 green after FR11 evidence (`cd backend && python -m pytest -q`).
 The Attack Lab route now produces downloadable altered files; its UI explains conditional
 verdict predictions and the original verification settings to use.
 
@@ -243,7 +243,7 @@ Owner: ______
 These are the five official optional challenges. None are required for the core rubric — attempt
 after A–H are green. Pick one or two and go deep rather than spreading thin across all five.
 
-- [x] **Video cover object** — `video_codec.load_avi` / `save_avi` (audio-track embedding, AVI
+- [x] **Video cover object** (Ke Ying) — `video_codec.load_avi` / `save_avi` (audio-track embedding, AVI
       container), `CoverKind.video` / `VideoInfo` in `schemas.py`, `.avi` MIME in `storage.py`, and
       the Protect/Verify/Attack Lab pages + `VideoCompare.tsx` all done; `tests/test_video_codec.py`
       is green (5/5).
@@ -252,7 +252,9 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
 - [ ] **Robust embedding** — improve payload survival under compression, noise, resampling or
       mild transformation, using redundancy, error correction (e.g. repetition or Hamming codes)
       or spread-spectrum techniques. Document the trade-off against raw capacity.
-- [ ] **Attack simulation module** — overlaps workstream F. Extend `attacks.py` beyond the six
+- [x] **Attack simulation module** — covered by workstream F (Kannon): tampering, payload
+      corruption, LSB scrub, re-encode, crop and replay/substitution in `attacks.py`, with wrong key
+      and wrong start location shown through Verify. Overlaps workstream F. Extend `attacks.py` beyond the six
       required functions to also simulate wrong-key verification, payload corruption, wrong
       start-location extraction, and replay/substitution attempts, each asserting the verdict
       `attacks.EXPECTED` predicts.

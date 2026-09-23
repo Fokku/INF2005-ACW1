@@ -33,19 +33,13 @@ class ImageCover:
 def load_png(data: bytes) -> ImageCover:
     """Decode PNG bytes into a flat uint8 array.
 
-    TODO(team): implement.
+    Non-PNG data (including JPEG) and 16-bit / floating-point modes raise
+    UnsupportedCoverError. P, L, LA, 1 and RGB images are converted to RGB;
+    RGBA stays RGBA. The array is flattened in (h, w, c) order and the mode the
+    file arrived in is kept in `original_mode` for the report.
 
-    Sketch:
-      img = Image.open(io.BytesIO(data))
-      if img.format != "PNG": raise UnsupportedCoverError(...)
-      original_mode = img.mode
-      convert P/L/LA/RGB -> "RGB", keep "RGBA" as "RGBA"; "I;16" -> unsupported
-      arr = np.asarray(img, dtype=np.uint8)          # (h, w, c)
-      return ImageCover(arr.reshape(-1), h, w, c, original_mode)
-
-    Note on alpha: if you embed into the alpha channel of an RGBA image, a fully
-    transparent pixel can hide bits invisibly — that is fine here, but say so in
-    the design doc. Simplest defensible choice: normalise everything to RGB.
+    Note on alpha: RGBA covers keep their alpha channel, so it carries payload
+    bits like any other channel. Converting LA to RGB discards its transparency.
     """
     try:
         img = Image.open(io.BytesIO(data))
@@ -81,14 +75,8 @@ def load_png(data: bytes) -> ImageCover:
 def save_png(cover: ImageCover, elements: np.ndarray) -> bytes:
     """Rebuild PNG bytes from (possibly modified) elements.
 
-    TODO(team): implement.
-
-    Sketch:
-      arr = elements.reshape(cover.height, cover.width, cover.channels)
-      Image.fromarray(arr, mode="RGB"/"RGBA").save(buf, format="PNG", optimize=False)
-
-    Do not pass quality/lossy options. Verify with a round-trip test that
-    load_png(save_png(x)) returns identical elements.
+    PNG is lossless, so load_png(save_png(x)) returns identical elements —
+    tests/test_image_codec.py checks this. No quality or lossy options are passed.
     """
     mode = "RGBA" if cover.channels == 4 else "RGB"
     arr = elements.reshape(cover.height, cover.width, cover.channels)
@@ -105,10 +93,8 @@ def lsb_plane_png(cover: ImageCover, elements: np.ndarray, n_lsb: int) -> bytes:
     cover's LSB plane looks like noise, the stego object's looks structured
     where the payload sits.
 
-    TODO(team): implement (nice-to-have, do it after the round-trip works).
-
-    Sketch: take elements & ((1<<n_lsb)-1), multiply by 255 // ((1<<n_lsb)-1),
-    reshape, save as PNG.
+    Each element is masked to its low `n_lsb` bits and scaled to the full
+    0–255 range, then saved as a PNG with the cover's shape.
     """
     max_val = (1 << n_lsb) - 1
     plane = (elements & max_val).astype(np.uint8) * (255 // max_val)
