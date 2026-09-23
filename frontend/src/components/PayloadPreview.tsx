@@ -13,6 +13,7 @@ import { Exhibit } from './Exhibit'
 export function PayloadPreview({ payload }: { payload: PayloadInfo }) {
   const file = payload.message_file
   const mime = payload.message_mime
+  const locked = payload.message_encrypted && !payload.message_decrypted
 
   return (
     <div className="space-y-4">
@@ -20,11 +21,18 @@ export function PayloadPreview({ payload }: { payload: PayloadInfo }) {
         <h3 className="font-stamp text-lg">Extracted payload</h3>
         <span className="font-exhibit text-xs text-base-content/60">{mime}</span>
         {payload.message_encrypted && (
-          <span className="badge badge-primary badge-sm">decrypted with AES-256-GCM</span>
+          <span className={`badge badge-sm ${locked ? 'badge-warning' : 'badge-primary'}`}>
+            {locked ? 'Encrypted — not decrypted' : 'Decrypted with AES-256-GCM'}
+          </span>
         )}
       </div>
 
-      {payload.message_text !== null && payload.message_text !== undefined ? (
+      {locked ? (
+        <p role="alert" className="text-sm text-warning">
+          {payload.decryption_error ?? 'Enter the sender’s passphrase to decrypt the message.'}
+          {' '}Verification and decryption are separate. Enter the passphrase and select Extract and verify again.
+        </p>
+      ) : payload.message_text !== null && payload.message_text !== undefined ? (
         <pre className="border-base-300 bg-base-200 max-h-64 overflow-auto rounded-sm border p-3 text-sm whitespace-pre-wrap">
           {payload.message_text}
         </pre>
@@ -32,12 +40,14 @@ export function PayloadPreview({ payload }: { payload: PayloadInfo }) {
         <img src={file.url} alt="extracted payload" className="border-base-300 max-h-64 rounded-sm border" />
       ) : file && mime.startsWith('audio/') ? (
         <audio controls src={file.url} className="w-full" />
-      ) : file ? (
+      ) : file ? null : (
+        <p className="text-sm text-base-content/50">No message content returned.</p>
+      )}
+
+      {!locked && file && (
         <a href={file.download_url} className="btn btn-outline btn-sm">
           Download {file.filename}
         </a>
-      ) : (
-        <p className="text-sm text-base-content/50">No message content returned.</p>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">

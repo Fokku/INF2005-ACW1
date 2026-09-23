@@ -209,6 +209,8 @@ Builds on the team's implementation, including Zong Han's FR10 verdict logic.
 - [x] Exact message recovery, wrong/missing passphrase checks and oversized-payload rejection
 - [x] 18 automated API cases passing; samples, public keys and reports in `evidence/fr10-fr11/`
 - [x] Reproduction script: `scripts/generate_verification_evidence.py`
+- [x] Fix explicit-mode passphrase entry, decryption status and readable downloads;
+      32 regression cases and PNG/WAV browser checks passed (629 backend tests total)
 - [ ] Party A → Party B attachment transfer, received-file verification and screenshots
 - [ ] Confirm the proposed custom demo message with the team
 

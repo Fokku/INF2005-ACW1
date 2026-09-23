@@ -181,14 +181,12 @@ def generate(client, output):
                     passphrase="wrong-demo-passphrase",
                 )
                 require(no_secret["payload"]["message_encrypted"] is True, no_secret)
-                require(
-                    recovered(client, no_secret) != text.encode(),
-                    "Plaintext exposed without passphrase",
-                )
-                require(
-                    recovered(client, wrong_secret) != text.encode(),
-                    "Plaintext exposed with wrong passphrase",
-                )
+                for locked in (no_secret, wrong_secret):
+                    require(locked["payload"]["message_decrypted"] is False, locked)
+                    require(locked["payload"]["decryption_error"], locked)
+                    require(locked["payload"]["message_text"] is None, locked)
+                    require(locked["payload"]["message_file"] is None, locked)
+                require(result["payload"]["message_decrypted"] is True, result)
                 record["encryption_checks"] = {
                     "correct_secret_recovers_exact_message": True,
                     "absent_and_wrong_secret_do_not_recover_plaintext": True,
