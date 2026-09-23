@@ -165,6 +165,10 @@ class PayloadInfo(BaseModel):
     )
     message_mime: str
     message_encrypted: bool
+    message_decrypted: bool = Field(
+        default=False, description="True only after successful message decryption"
+    )
+    decryption_error: str | None = None
     message_text: str | None = Field(
         default=None, description="present when the message is text and readable"
     )

@@ -18,6 +18,7 @@ export function StartLocationPanel({
   explicitStart,
   onExplicitStartChange,
   maxStart,
+  showEncryptionPassphrase = false,
 }: {
   mode: StartMode
   onModeChange: (mode: StartMode) => void
@@ -26,6 +27,7 @@ export function StartLocationPanel({
   explicitStart: number
   onExplicitStartChange: (value: number) => void
   maxStart?: number
+  showEncryptionPassphrase?: boolean
 }) {
   return (
     <div className="space-y-3">
@@ -99,6 +101,21 @@ export function StartLocationPanel({
             />
           </Field>
         </>
+      )}
+      {mode === 'explicit' && showEncryptionPassphrase && (
+        <Field
+          label="Message passphrase"
+          htmlFor="message-passphrase"
+          help="For encrypted messages, enter the sender's passphrase. This does not change the explicit start offset."
+        >
+          <input
+            id="message-passphrase"
+            type="password"
+            className="input w-full"
+            value={passphrase}
+            onChange={(e) => onPassphraseChange(e.target.value)}
+          />
+        </Field>
       )}
     </div>
   )

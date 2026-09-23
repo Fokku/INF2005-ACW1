@@ -159,6 +159,7 @@ export function ProtectPage() {
           <LsbSelector value={nLsb} onChange={setNLsb} />
           <CapacityMeter report={capacity} messageBytes={messageBytes} />
           <StartLocationPanel
+            showEncryptionPassphrase={encrypt}
             mode={startMode}
             onModeChange={setStartMode}
             passphrase={passphrase}

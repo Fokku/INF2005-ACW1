@@ -240,6 +240,8 @@ class VerifyOutcome:
     media_hash_recomputed: str | None
     start_offset_used: int | None
     signature_valid: bool | None = None
+    message_decrypted: bool = False
+    decryption_error: str | None = None
 
 
 def _give_up(outcome: ExtractionOutcome, start: int | None, detail: str | None = None) -> VerifyOutcome:
@@ -389,6 +391,8 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
 
         # --- Best-effort decrypt, for display only — never affects the verdict -------
         payload_json = json.loads(payload_bytes)
+        message_decrypted = False
+        decryption_error = "Enter the sender's passphrase to decrypt the message." if pl.encrypted else None
         if pl.encrypted and opts.passphrase:
             try:
                 salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
@@ -397,14 +401,18 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
                     derived.k_enc, pl.message, aad=opts.media_id.encode("utf-8")
                 )
                 payload_json["message_b64"] = base64.b64encode(plaintext).decode("ascii")
+                message_decrypted = True
+                decryption_error = None
             except FrameError:
-                pass  # wrong passphrase for decryption alone does not change the verdict
+                decryption_error = "Could not decrypt the message. Check the sender's passphrase."
 
         verdict, reasons = decide(outcome)
         return VerifyOutcome(
             verdict=verdict,
             reasons=reasons,
             payload_json=payload_json,
+            message_decrypted=message_decrypted,
+            decryption_error=decryption_error,
             media_hash_embedded=pl.media_hash,
             media_hash_recomputed=media_hash_recomputed,
             start_offset_used=start,

@@ -97,6 +97,8 @@ export interface PayloadInfo {
   metadata: Record<string, string>
   message_mime: string
   message_encrypted: boolean
+  message_decrypted: boolean
+  decryption_error: string | null
   message_text?: string | null
   message_file?: FileRef | null
 }

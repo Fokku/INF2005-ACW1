@@ -115,6 +115,7 @@ export function VerifyPage() {
             This must match what party A used. Pick the wrong number and the frame will not parse.
           </p>
           <StartLocationPanel
+            showEncryptionPassphrase
             mode={startMode}
             onModeChange={setStartMode}
             passphrase={passphrase}

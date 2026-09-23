@@ -102,16 +102,14 @@ async def verify(
         message_bytes = base64.b64decode(pd["message_b64"])
         message_text = None
         message_file = None
-        if pd["message_mime"].startswith("text/") and not pd["encrypted"]:
+        readable = not pd["encrypted"] or outcome.message_decrypted
+        if pd["message_mime"].startswith("text/") and readable:
             try:
                 message_text = message_bytes.decode("utf-8")
             except UnicodeDecodeError:
                 message_text = None
-        if message_text is None:
-            # Either a non-text MIME, or an encrypted message pipeline.verify
-            # could not decrypt (no/wrong passphrase) — offer it as a file
-            # either way; pd["encrypted"] still truthfully records whether it
-            # WAS sent encrypted, separately from whether we could read it.
+        if readable:
+            # Never label ciphertext as a readable text/image/audio download.
             ext = _EXT_BY_MIME.get(pd["message_mime"], ".bin")
             message_file = FileRef(**storage.save(message_bytes, f"message{ext}"))
 
@@ -127,6 +125,8 @@ async def verify(
             metadata=pd["metadata"],
             message_mime=pd["message_mime"],
             message_encrypted=pd["encrypted"],
+            message_decrypted=outcome.message_decrypted,
+            decryption_error=outcome.decryption_error,
             message_text=message_text,
             message_file=message_file,
         )
