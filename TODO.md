@@ -57,7 +57,7 @@ Watch out: 16-bit WAV needs a `uint16` view. Never write JPEG.
 
 ## C · Crypto — `hashing.py`, `kdf.py`, `signing.py`, `payload.py`
 
-Owner: Zong Han (done)
+Owner: Zong Han (`hashing.py`, `kdf.py`, done); Wen Xuan (`signing.py`, `payload.py` — FR3/FR4, done)
 
 - [x] `stable_media_hash` — SHA-256 over samples with the low N bits masked, plus the format fields
 - [x] `derive_keys` — passphrase → scrypt → HKDF → `K_loc`, `K_enc`
@@ -177,7 +177,7 @@ Technical documents are complete. Personal AI-use confirmations remain a team ac
 
 ## H · Samples, evidence and test cases — `samples/`, `evidence/`, `scripts/make_samples.py`
 
-Owner: ______ (script + samples done; screenshots and the email round trip still open)
+Owner: Wen Xuan (script + samples done; screenshots and the email round trip still open)
 
 The spec needs **at least 2 positive and 3 negative cases**, with at least one of each per cover
 object. `scripts/make_samples.py` now produces all 7 (plus `Cannot Verify`, proven separately in
@@ -226,7 +226,8 @@ See `evidence/fr10-fr11/manifest.json` for case results and verification setting
 
 ## I · Submission and demo — `README.md`, `docs/demo-plan.md`
 
-Owner: ______
+Owner: Wen Xuan (README "Expected outputs" and `docs/demo-plan.md` running order done; the rest —
+team number, declaration, contribution statement, rehearsal — is a whole-team action, not one owner)
 
 Can start now.
 
@@ -246,7 +247,8 @@ Code, README, samples, evidence and keys are due **Week 5 Friday**.
 
 ## J · Optional challenges (bonus, spec Section 8)
 
-Owner: ______
+Owner: Ke Ying (video cover object, done); Wen Xuan (robust embedding, implemented and tested,
+not yet merged — see the `robust-embedding` branch)
 
 These are the five official optional challenges. None are required for the core rubric — attempt
 after A–H are green. Pick one or two and go deep rather than spreading thin across all five.
