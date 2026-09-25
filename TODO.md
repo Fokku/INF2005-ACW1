@@ -177,10 +177,11 @@ Technical documents are complete. Personal AI-use confirmations remain a team ac
 
 ## H · Samples, evidence and test cases — `samples/`, `evidence/`, `scripts/make_samples.py`
 
-Owner: ______
+Owner: ______ (script + samples done; screenshots and the email round trip still open)
 
 The spec needs **at least 2 positive and 3 negative cases**, with at least one of each per cover
-object. Suggested set:
+object. `scripts/make_samples.py` now produces all 7 (plus `Cannot Verify`, proven separately in
+`test_attacks.py` — see README):
 
 | # | Cover | Case | Expected |
 | --- | --- | --- | --- |
@@ -192,12 +193,19 @@ object. Suggested set:
 | 6 | image | verify with the wrong passphrase | Wrong Start Location |
 | 7 | image | payload larger than the cover | capacity error, blocked before embedding |
 
-- [ ] Source one PNG (512×512 or larger) and one 16-bit PCM WAV (5 s or longer)
-- [ ] Three payload sizes: a Learning Outcome (short), the Project Overview paragraph (large),
-      and the team's custom encrypted message — all three are preset in the Protect tab
-- [ ] Produce the original, stego and tampered files for both cover types
-- [ ] `scripts/make_samples.py` so every sample regenerates deterministically
-- [ ] Screenshots of each verdict, plus `pytest` output, into `evidence/`
+- [x] Source one PNG (512×512 or larger) and one 16-bit PCM WAV (5 s or longer) — generated
+      deterministically by `scripts/make_samples.py` (fixed RNG seed), not hand-sourced
+- [x] Three payload sizes: a Learning Outcome (short), the Project Overview paragraph (large),
+      and the team's custom encrypted message — all three under `samples/payloads/`, embedded for
+      both cover types
+- [x] Produce the original, stego and tampered files for both cover types — 18 files under `samples/`
+- [x] `scripts/make_samples.py` so every sample regenerates deterministically — the cover files and
+      demo key pair are fixed across runs; every case re-verifies to the same verdict on every run
+      (nonce/timestamp inside the signed payload vary by design, so stego bytes are not literally
+      byte-identical — see the script's docstring)
+- [x] README's "Expected outputs" table — every sample file, its settings, and its verdict
+- [ ] Screenshots of each verdict (`evidence/logs/sample-manifest.json` has the text form; GUI
+      screenshots for the submission are still needed)
 - [ ] The party A → party B run: email the stego file **as an attachment**, download it, verify it,
       and show the SHA-256 matching on both sides
 
@@ -226,7 +234,7 @@ Can start now.
 - [ ] Demo plan: ≤ 25 minutes, a slot for **every** member, who shows what and in what order
 - [ ] Declaration of Originality, signed by all six
 - [ ] Contribution/distribution statement with percentages, agreed by all six
-- [ ] Complete the README's "Expected outputs" section — every sample, its command, its verdict
+- [x] Complete the README's "Expected outputs" section — every sample, its command, its verdict
 - [ ] Commit `keys/public/*.pem`; confirm no private key is in git history
 - [ ] Ship `frontend/dist` in the submission so the marker needs only Python
 - [ ] Rehearse twice on the actual lab PC, including the email round trip
