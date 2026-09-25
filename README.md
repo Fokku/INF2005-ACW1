@@ -8,8 +8,10 @@ A GUI-based **LSB-replacement steganography** tool that protects a PNG image and
 > end to end for image, audio, and video covers — 629/629 backend tests green. The Attack Lab
 > implements six PNG/WAV attacks, plus five AVI audio-track attacks (AVI crop is unsupported).
 > See [the Attack Lab design and demo guide](docs/design/attack-lab.md) for verdict conditions.
-> What's left is the `stego` CLI, `scripts/make_samples.py` and the sample set, the
-> party A → B email evidence, and the submission admin (demo plan, declaration, contribution statement).
+> The curated `samples/` set and `scripts/make_samples.py` are done — see "Expected outputs" below.
+> What's left is the `stego` CLI (a rescue path if the web UI misbehaves; not required, since the GUI
+> and `scripts/make_samples.py` already cover every FR1–11 case), the party A → B email evidence,
+> and the submission admin (demo plan, declaration, contribution statement).
 > See [TODO.md](TODO.md) for the nine workstreams and [TECH_STACK.md](TECH_STACK.md) for the stack.
 >
 > Find your work with: `grep -rn "TODO(team)" backend frontend scripts`
@@ -105,12 +107,60 @@ the UI needs it.
 
 ### Expected outputs
 
-Filled in once the implementation exists. This section must eventually list, for every file under `samples/`, the exact `stego verify` command (or GUI steps), the passphrase / start location used, and the expected verdict, so the marker can reproduce every demonstrated case (spec FR12).
+Every file under `samples/` is produced by one command, run from the repo root with the venv active:
+
+```bash
+PYTHONPATH=backend python scripts/make_samples.py     # Windows: set PYTHONPATH=backend
+```
+
+This (re)creates `samples/image/original/cover.png` (512×512 RGB) and `samples/audio/original/cover.wav`
+(16-bit mono PCM, 5 s) the first time it runs, generates a demo Ed25519 key pair under `keys/` if one
+is not already there, protects both covers with every case below, and writes
+`evidence/logs/sample-manifest.json` — the same settings and verdicts as the table below, freshly
+re-verified. The cover files and key pair are reused (not regenerated) on later runs, so only the
+stego/tampered files change between runs — see the script's docstring for why byte-identical stego
+output is neither possible nor desirable (the signed payload includes a fresh nonce and timestamp
+every time by design).
+
+All cases below use `n_lsb=2` and the demo key pair at `keys/public/team_ed25519.pub.pem`
+(private half gitignored under `keys/private/`, regenerated locally by the script above).
+To reproduce a case through the **GUI** instead of pytest/`pipeline` calls directly: open the
+Verify tab, upload the file, paste the public key PEM, and fill in the settings column.
+
+| Case | File | Cover / message | Settings | Expected verdict |
+| --- | --- | --- | --- | --- |
+| Short message | `samples/image/stego/image-short.stego.png` | image, Learning Outcome 1 (105 B) | explicit start 128 | **Authentic** |
+| Short message | `samples/audio/stego/audio-short.stego.wav` | audio, Learning Outcome 1 (105 B) | explicit start 128 | **Authentic** |
+| Large message | `samples/image/stego/image-large.stego.png` | image, Project Overview paragraph (675 B) | explicit start 128 | **Authentic** |
+| Large message | `samples/audio/stego/audio-large.stego.wav` | audio, Project Overview paragraph (675 B) | explicit start 128 | **Authentic** |
+| Custom encrypted message | `samples/image/stego/image-custom.stego.png` | image, team release-note message, AES-256-GCM encrypted | explicit start 128, passphrase `acw1-demo-passphrase-2026` | **Authentic** (message decrypts) |
+| Custom encrypted message | `samples/audio/stego/audio-custom.stego.wav` | audio, same custom message | explicit start 128, passphrase `acw1-demo-passphrase-2026` | **Authentic** |
+| Tampered | `samples/image/tampered/image-flip_bits.png` | `image-short.stego.png` with a high-bit flip attack applied | explicit start 128 | **Tampered** |
+| Tampered | `samples/audio/tampered/audio-flip_bits.wav` | `audio-short.stego.wav`, same attack | explicit start 128 | **Tampered** |
+| Signature Invalid | `image-short.stego.png` / `audio-short.stego.wav` (reused) | verified with a mismatched public key | explicit start 128 | **Signature Invalid** |
+| Payload Missing | `samples/image/original/cover-empty.png` | a small (32×32) untouched cover, never protected | explicit start 128 | **Payload Missing** |
+| Payload Missing | `samples/audio/original/cover-empty.wav` | a small (0.5 s) untouched cover | explicit start 128 | **Payload Missing** |
+| Wrong Start Location | `samples/image/stego/image-derived-start.stego.png` | protected with a **derived** start (correct passphrase `acw1-demo-passphrase-2026`) | verified with the **wrong** passphrase | **Wrong Start Location** |
+| Wrong Start Location | `samples/audio/stego/audio-derived-start.stego.wav` | same, audio | verified with the wrong passphrase | **Wrong Start Location** |
+| Capacity check | — (`image-oversized`, `audio-oversized`) | a 10 MB message against either cover at `n_lsb=2` | protect is attempted | Blocked before embedding: `CapacityError` — "payload does not fit: the frame needs 13,333,808 bytes ... but this cover only has capacity for 196,608 bytes" (image); analogous for audio |
+
+`Cannot Verify` is demonstrated separately (not regenerated by this script, since it needs a large
+cover): verifying the full 512×512 `cover.png` unprotected reports `Cannot Verify` — "the remaining
+locations were not searched, so payload absence cannot be confirmed" — because an exhaustive
+LSB-magic scan over that many candidate offsets exceeds `location.MAX_SCAN_POSITIONS`. See
+`backend/tests/test_attacks.py::test_large_cover_attack_reports_incomplete_search` for the
+automated proof of this case, and `docs/design/attack-lab.md` / `evidence/section-f.md` for six more
+attack-driven negative cases (`crop`, `lsb_scrub`, `reencode`, `corrupt_payload`, `replay`) with
+screenshots.
+
+**Still outstanding** (spec FR11/FR12 — see [TODO.md](TODO.md) workstreams H and I): the actual
+party A → party B email transfer with before/after SHA-256 screenshots has not been performed yet;
+everything above is reproducible locally but has not been demonstrated over a real transfer.
 
 ## Keys
 
 - The team's **public key** lives in `keys/public/` and is what a verifier (and the marker) uses.
-- The **private key** used for the demo is generated only for this assignment with `stego keygen`, kept in `keys/private/`, and is gitignored. Anyone cloning the repository can generate a fresh pair; samples regenerated with `scripts/make_samples.py` then verify against the new public key.
+- The **private key** used for the demo is generated only for this assignment, kept in `keys/private/`, and is gitignored. `scripts/make_samples.py` generates the pair automatically the first time it runs (via `stego_core.signing.generate_keypair`) if `keys/private/team_ed25519.pem` doesn't already exist. Anyone cloning the repository can delete `keys/private/` and re-run the script for a fresh pair; the samples under `samples/` then regenerate and verify against the new public key. (`stego keygen` will do the same once the CLI is implemented — see `TODO.md` workstream E.)
 
 ## Deadlines
 

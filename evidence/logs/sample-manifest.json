@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-09-25T14:51:34.670128+00:00",
+  "generated_at": "2026-09-25T17:27:23.914270+00:00",
   "cases": [
     {
       "case": "image-short-authentic",
       "file": "samples\\image\\stego\\image-short.stego.png",
       "settings": {
         "expected": "Authentic",
-        "media_id": "P1-4-image-short",
+        "media_id": "P6-8-image-short",
         "n_lsb": 2,
         "start_mode": "explicit",
         "explicit_start": 128,
@@ -23,7 +23,7 @@
       "file": "samples\\image\\stego\\image-large.stego.png",
       "settings": {
         "expected": "Authentic",
-        "media_id": "P1-4-image-large",
+        "media_id": "P6-8-image-large",
         "n_lsb": 2,
         "start_mode": "explicit",
         "explicit_start": 128,
@@ -40,7 +40,7 @@
       "file": "samples\\image\\stego\\image-custom.stego.png",
       "settings": {
         "expected": "Authentic",
-        "media_id": "P1-4-image-custom",
+        "media_id": "P6-8-image-custom",
         "n_lsb": 2,
         "start_mode": "explicit",
         "explicit_start": 128,
@@ -57,7 +57,7 @@
       "file": "samples\\image\\tampered\\image-flip_bits.png",
       "settings": {
         "expected": "Tampered",
-        "media_id": "P1-4-image-short",
+        "media_id": "P6-8-image-short",
         "n_lsb": 2,
         "explicit_start": 128,
         "attack": "flip_bits"
@@ -72,7 +72,7 @@
       "file": null,
       "settings": {
         "expected": "Signature Invalid",
-        "media_id": "P1-4-image-short",
+        "media_id": "P6-8-image-short",
         "n_lsb": 2,
         "explicit_start": 128,
         "public_key": "wrong (mismatched) public key"
@@ -87,7 +87,7 @@
       "file": "samples\\image\\original\\cover-empty.png",
       "settings": {
         "expected": "Payload Missing",
-        "media_id": "P1-4-image-short",
+        "media_id": "P6-8-image-short",
         "n_lsb": 2,
         "explicit_start": 128,
         "note": "a small untouched cover -- never protected, so no payload is found anywhere"
@@ -102,7 +102,7 @@
       "file": "samples\\image\\stego\\image-derived-start.stego.png",
       "settings": {
         "expected": "Wrong Start Location",
-        "media_id": "P1-4-image-derived",
+        "media_id": "P6-8-image-derived",
         "n_lsb": 2,
         "start_mode": "derived",
         "correct_passphrase": "acw1-demo-passphrase-2026",
@@ -127,7 +127,7 @@
       "file": "samples\\audio\\stego\\audio-short.stego.wav",
       "settings": {
         "expected": "Authentic",
-        "media_id": "P1-4-audio-short",
+        "media_id": "P6-8-audio-short",
         "n_lsb": 2,
         "start_mode": "explicit",
         "explicit_start": 128,
@@ -144,7 +144,7 @@
       "file": "samples\\audio\\stego\\audio-large.stego.wav",
       "settings": {
         "expected": "Authentic",
-        "media_id": "P1-4-audio-large",
+        "media_id": "P6-8-audio-large",
         "n_lsb": 2,
         "start_mode": "explicit",
         "explicit_start": 128,
@@ -161,7 +161,7 @@
       "file": "samples\\audio\\stego\\audio-custom.stego.wav",
       "settings": {
         "expected": "Authentic",
-        "media_id": "P1-4-audio-custom",
+        "media_id": "P6-8-audio-custom",
         "n_lsb": 2,
         "start_mode": "explicit",
         "explicit_start": 128,
@@ -178,7 +178,7 @@
       "file": "samples\\audio\\tampered\\audio-flip_bits.wav",
       "settings": {
         "expected": "Tampered",
-        "media_id": "P1-4-audio-short",
+        "media_id": "P6-8-audio-short",
         "n_lsb": 2,
         "explicit_start": 128,
         "attack": "flip_bits"
@@ -193,7 +193,7 @@
       "file": null,
       "settings": {
         "expected": "Signature Invalid",
-        "media_id": "P1-4-audio-short",
+        "media_id": "P6-8-audio-short",
         "n_lsb": 2,
         "explicit_start": 128,
         "public_key": "wrong (mismatched) public key"
@@ -208,7 +208,7 @@
       "file": "samples\\audio\\original\\cover-empty.wav",
       "settings": {
         "expected": "Payload Missing",
-        "media_id": "P1-4-audio-short",
+        "media_id": "P6-8-audio-short",
         "n_lsb": 2,
         "explicit_start": 128,
         "note": "a small untouched cover -- never protected, so no payload is found anywhere"
@@ -223,7 +223,7 @@
       "file": "samples\\audio\\stego\\audio-derived-start.stego.wav",
       "settings": {
         "expected": "Wrong Start Location",
-        "media_id": "P1-4-audio-derived",
+        "media_id": "P6-8-audio-derived",
         "n_lsb": 2,
         "start_mode": "derived",
         "correct_passphrase": "acw1-demo-passphrase-2026",

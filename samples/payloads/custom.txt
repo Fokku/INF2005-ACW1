@@ -1,0 +1,1 @@
+CONFIDENTIAL — ACW1 demo release note: this custom payload is a synthetic, team-authored message used only to demonstrate AES-256-GCM confidentiality layered on top of the signed integrity payload. It contains no real personal or confidential information.

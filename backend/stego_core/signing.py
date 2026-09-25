@@ -1,10 +1,7 @@
 """Digital signatures (spec FR4, learning outcome 3).
 
 Ed25519 by default: 32-byte keys, 64-byte signatures. A small signature matters
-because it is embedded inside the cover and eats capacity. RSA-PSS also works if
-the team prefers to talk about RSA in the demo — keep the same three functions
-and note the signature grows to 256 bytes at RSA-2048, which changes the frame
-size in `container.py`.
+because it is embedded inside the cover and eats capacity.
 
 Key files use standard PEM so any tool can read them:
     private  PKCS#8    keys/private/team_ed25519.pem   (gitignored, demo-only)
