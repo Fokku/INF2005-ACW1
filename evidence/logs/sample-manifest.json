@@ -1,0 +1,247 @@
+{
+  "generated_at": "2026-09-25T17:27:23.914270+00:00",
+  "cases": [
+    {
+      "case": "image-short-authentic",
+      "file": "samples\\image\\stego\\image-short.stego.png",
+      "settings": {
+        "expected": "Authentic",
+        "media_id": "P6-8-image-short",
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "explicit_start": 128,
+        "passphrase": null,
+        "message_bytes": 105
+      },
+      "verdict": "Authentic",
+      "reasons": [
+        "signature valid, media hash matches, parameters match the signed payload"
+      ]
+    },
+    {
+      "case": "image-large-authentic",
+      "file": "samples\\image\\stego\\image-large.stego.png",
+      "settings": {
+        "expected": "Authentic",
+        "media_id": "P6-8-image-large",
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "explicit_start": 128,
+        "passphrase": null,
+        "message_bytes": 673
+      },
+      "verdict": "Authentic",
+      "reasons": [
+        "signature valid, media hash matches, parameters match the signed payload"
+      ]
+    },
+    {
+      "case": "image-custom-authentic",
+      "file": "samples\\image\\stego\\image-custom.stego.png",
+      "settings": {
+        "expected": "Authentic",
+        "media_id": "P6-8-image-custom",
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "explicit_start": 128,
+        "passphrase": "acw1-demo-passphrase-2026",
+        "message_bytes": 257
+      },
+      "verdict": "Authentic",
+      "reasons": [
+        "signature valid, media hash matches, parameters match the signed payload"
+      ]
+    },
+    {
+      "case": "image-tampered",
+      "file": "samples\\image\\tampered\\image-flip_bits.png",
+      "settings": {
+        "expected": "Tampered",
+        "media_id": "P6-8-image-short",
+        "n_lsb": 2,
+        "explicit_start": 128,
+        "attack": "flip_bits"
+      },
+      "verdict": "Tampered",
+      "reasons": [
+        "the recomputed media hash does not match the hash signed into the payload"
+      ]
+    },
+    {
+      "case": "image-signature-invalid",
+      "file": null,
+      "settings": {
+        "expected": "Signature Invalid",
+        "media_id": "P6-8-image-short",
+        "n_lsb": 2,
+        "explicit_start": 128,
+        "public_key": "wrong (mismatched) public key"
+      },
+      "verdict": "Signature Invalid",
+      "reasons": [
+        "the digital signature does not verify against the supplied public key \u2014 wrong key, or the signed payload was altered"
+      ]
+    },
+    {
+      "case": "image-payload-missing",
+      "file": "samples\\image\\original\\cover-empty.png",
+      "settings": {
+        "expected": "Payload Missing",
+        "media_id": "P6-8-image-short",
+        "n_lsb": 2,
+        "explicit_start": 128,
+        "note": "a small untouched cover -- never protected, so no payload is found anywhere"
+      },
+      "verdict": "Payload Missing",
+      "reasons": [
+        "no embedded payload could be found anywhere in this cover \u2014 it may never have been protected, or the LSB plane was destroyed by re-encoding"
+      ]
+    },
+    {
+      "case": "image-wrong-start-location",
+      "file": "samples\\image\\stego\\image-derived-start.stego.png",
+      "settings": {
+        "expected": "Wrong Start Location",
+        "media_id": "P6-8-image-derived",
+        "n_lsb": 2,
+        "start_mode": "derived",
+        "correct_passphrase": "acw1-demo-passphrase-2026",
+        "passphrase_used": "wrong-passphrase-entirely",
+        "note": "right key, DERIVED start, WRONG passphrase -- the verifier looks in the wrong place entirely"
+      },
+      "verdict": "Wrong Start Location",
+      "reasons": [
+        "payload magic was not found at the expected start location, but was found elsewhere in the cover \u2014 check the passphrase / explicit start offset"
+      ]
+    },
+    {
+      "case": "image-oversized",
+      "settings": {
+        "n_lsb": 2
+      },
+      "error": "CapacityError",
+      "detail": "payload does not fit: the frame needs 13333808 bytes (106670464 bits) at n_lsb=2, but this cover only has capacity for 196608 bytes"
+    },
+    {
+      "case": "audio-short-authentic",
+      "file": "samples\\audio\\stego\\audio-short.stego.wav",
+      "settings": {
+        "expected": "Authentic",
+        "media_id": "P6-8-audio-short",
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "explicit_start": 128,
+        "passphrase": null,
+        "message_bytes": 105
+      },
+      "verdict": "Authentic",
+      "reasons": [
+        "signature valid, media hash matches, parameters match the signed payload"
+      ]
+    },
+    {
+      "case": "audio-large-authentic",
+      "file": "samples\\audio\\stego\\audio-large.stego.wav",
+      "settings": {
+        "expected": "Authentic",
+        "media_id": "P6-8-audio-large",
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "explicit_start": 128,
+        "passphrase": null,
+        "message_bytes": 673
+      },
+      "verdict": "Authentic",
+      "reasons": [
+        "signature valid, media hash matches, parameters match the signed payload"
+      ]
+    },
+    {
+      "case": "audio-custom-authentic",
+      "file": "samples\\audio\\stego\\audio-custom.stego.wav",
+      "settings": {
+        "expected": "Authentic",
+        "media_id": "P6-8-audio-custom",
+        "n_lsb": 2,
+        "start_mode": "explicit",
+        "explicit_start": 128,
+        "passphrase": "acw1-demo-passphrase-2026",
+        "message_bytes": 257
+      },
+      "verdict": "Authentic",
+      "reasons": [
+        "signature valid, media hash matches, parameters match the signed payload"
+      ]
+    },
+    {
+      "case": "audio-tampered",
+      "file": "samples\\audio\\tampered\\audio-flip_bits.wav",
+      "settings": {
+        "expected": "Tampered",
+        "media_id": "P6-8-audio-short",
+        "n_lsb": 2,
+        "explicit_start": 128,
+        "attack": "flip_bits"
+      },
+      "verdict": "Tampered",
+      "reasons": [
+        "the recomputed media hash does not match the hash signed into the payload"
+      ]
+    },
+    {
+      "case": "audio-signature-invalid",
+      "file": null,
+      "settings": {
+        "expected": "Signature Invalid",
+        "media_id": "P6-8-audio-short",
+        "n_lsb": 2,
+        "explicit_start": 128,
+        "public_key": "wrong (mismatched) public key"
+      },
+      "verdict": "Signature Invalid",
+      "reasons": [
+        "the digital signature does not verify against the supplied public key \u2014 wrong key, or the signed payload was altered"
+      ]
+    },
+    {
+      "case": "audio-payload-missing",
+      "file": "samples\\audio\\original\\cover-empty.wav",
+      "settings": {
+        "expected": "Payload Missing",
+        "media_id": "P6-8-audio-short",
+        "n_lsb": 2,
+        "explicit_start": 128,
+        "note": "a small untouched cover -- never protected, so no payload is found anywhere"
+      },
+      "verdict": "Payload Missing",
+      "reasons": [
+        "no embedded payload could be found anywhere in this cover \u2014 it may never have been protected, or the LSB plane was destroyed by re-encoding"
+      ]
+    },
+    {
+      "case": "audio-wrong-start-location",
+      "file": "samples\\audio\\stego\\audio-derived-start.stego.wav",
+      "settings": {
+        "expected": "Wrong Start Location",
+        "media_id": "P6-8-audio-derived",
+        "n_lsb": 2,
+        "start_mode": "derived",
+        "correct_passphrase": "acw1-demo-passphrase-2026",
+        "passphrase_used": "wrong-passphrase-entirely",
+        "note": "right key, DERIVED start, WRONG passphrase -- the verifier looks in the wrong place entirely"
+      },
+      "verdict": "Wrong Start Location",
+      "reasons": [
+        "payload magic was not found at the expected start location, but was found elsewhere in the cover \u2014 check the passphrase / explicit start offset"
+      ]
+    },
+    {
+      "case": "audio-oversized",
+      "settings": {
+        "n_lsb": 2
+      },
+      "error": "CapacityError",
+      "detail": "payload does not fit: the frame needs 13333807 bytes (106670456 bits) at n_lsb=2, but this cover only has capacity for 55125 bytes"
+    }
+  ]
+}
