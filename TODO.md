@@ -250,7 +250,7 @@ Code, README, samples, evidence and keys are due **Week 5 Friday**.
 
 ## J · Optional challenges (bonus, spec Section 8)
 
-Owner: Ke Ying (video cover object, done); Wen Xuan (robust embedding, implemented and tested,
+Owner: Ke Ying (video cover object, done; steganalysis, done); Wen Xuan (robust embedding, implemented and tested,
 not yet merged — see the `robust-embedding` branch)
 
 These are the five official optional challenges. None are required for the core rubric — attempt
@@ -274,11 +274,11 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
 - [ ] **Advanced start-location security** — overlaps workstream D. Derive the start location from
       a keyed pseudo-random function, an encrypted header, or a seed phrase (beyond the baseline
       keyed HMAC in `derive_start`), and write up its limitations in `docs/design/start-location.md`.
-- [ ] **Steganalysis** — using a known algorithm or methodology (e.g. chi-square attack, RS
+- [x] **Steganalysis** (Ke Ying) — using a known algorithm or methodology (e.g. chi-square attack, RS
       analysis, LSB histogram analysis), analyse one of the project's own stego samples and
       convincingly infer whether the cover shows signs of a hidden payload. Write up the method
       and result, ideally as a script under `scripts/` plus a short section in
-      `docs/design/limitations-and-ai-use.md`.
+      `docs/design/limitations-and-ai-use.md`. Done: `scripts/steganalysis.py`, `evidence/logs/steganalysis-demo.txt`.
 
 ---
 
