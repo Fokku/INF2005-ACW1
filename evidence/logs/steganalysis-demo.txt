@@ -1,0 +1,25 @@
+synthetic-photo original                     whole-file p=0.0000  flagged windows=0/48  suspected region: none
+synthetic-photo n_lsb=1 plain                whole-file p=0.0000  flagged windows=11/48  suspected region: elements 16384-196608
+synthetic-photo n_lsb=1 enc                  whole-file p=0.0000  flagged windows=11/48  suspected region: elements 16384-196608
+synthetic-photo n_lsb=2 plain                whole-file p=0.0000  flagged windows=6/48  suspected region: elements 16384-114688
+synthetic-photo n_lsb=2 enc                  whole-file p=0.0000  flagged windows=6/48  suspected region: elements 16384-114688
+real-photo original                          whole-file p=0.0000  flagged windows=0/56  suspected region: none
+real-photo n_lsb=1 plain                     whole-file p=0.0000  flagged windows=11/56  suspected region: elements 16384-196608
+real-photo n_lsb=1 enc                       whole-file p=0.0000  flagged windows=11/56  suspected region: elements 16384-196608
+real-photo n_lsb=2 plain                     whole-file p=0.0000  flagged windows=6/56  suspected region: elements 16384-114688
+real-photo n_lsb=2 enc                       whole-file p=0.0000  flagged windows=6/56  suspected region: elements 16384-114688
+real-audio original                          whole-file p=0.0000  flagged windows=0/11  suspected region: none
+real-audio n_lsb=1 plain                     whole-file p=0.0000  flagged windows=10/11  suspected region: elements 16384-180224
+real-audio n_lsb=1 enc                       whole-file p=0.0000  flagged windows=10/11  suspected region: elements 16384-180224
+real-audio n_lsb=2 plain                     whole-file p=0.0000  flagged windows=6/11  suspected region: elements 16384-114688
+real-audio n_lsb=2 enc                       whole-file p=0.0000  flagged windows=6/11  suspected region: elements 16384-114688
+real-video original                          whole-file p=0.0000  flagged windows=0/11  suspected region: none
+real-video n_lsb=1 plain                     whole-file p=0.0000  flagged windows=10/11  suspected region: elements 16384-180224
+real-video n_lsb=1 enc                       whole-file p=0.0000  flagged windows=10/11  suspected region: elements 16384-180224
+real-video n_lsb=2 plain                     whole-file p=0.0000  flagged windows=6/11  suspected region: elements 16384-114688
+real-video n_lsb=2 enc                       whole-file p=0.0000  flagged windows=6/11  suspected region: elements 16384-114688
+bundled cover.png                            whole-file p=0.9997  flagged windows=0/48  suspected region: none
+bundled image-short.stego.png                whole-file p=0.9998  flagged windows=1/48  suspected region: elements 0-16384
+bundled cover.wav                            whole-file p=1.0000  flagged windows=0/13  suspected region: none
+bundled audio-short.stego.wav                whole-file p=1.0000  flagged windows=1/13  suspected region: elements 0-16384
+report: INF2005-ACW1\evidence\steganalysis\steganalysis-report.json

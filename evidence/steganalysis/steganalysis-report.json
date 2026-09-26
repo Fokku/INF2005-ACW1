@@ -1,0 +1,372 @@
+{
+  "method": "chi-square pairs-of-values + byte-phase test, per window",
+  "window": 16384,
+  "cases": {
+    "synthetic-photo original": {
+      "elements": 786432,
+      "whole_file_p": 0.0,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 48,
+      "windows_flagged": 0,
+      "suspected_region": null,
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    },
+    "synthetic-photo n_lsb=1 plain": {
+      "elements": 786432,
+      "whole_file_p": 0.0,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 48,
+      "windows_flagged": 11,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 196608
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167632
+      }
+    },
+    "synthetic-photo n_lsb=1 enc": {
+      "elements": 786432,
+      "whole_file_p": 0.0,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 48,
+      "windows_flagged": 11,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 196608
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167912
+      }
+    },
+    "synthetic-photo n_lsb=2 plain": {
+      "elements": 786432,
+      "whole_file_p": 0.0,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 48,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83816
+      }
+    },
+    "synthetic-photo n_lsb=2 enc": {
+      "elements": 786432,
+      "whole_file_p": 0.0,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 48,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83956
+      }
+    },
+    "real-photo original": {
+      "elements": 921600,
+      "whole_file_p": 0.0,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 56,
+      "windows_flagged": 0,
+      "suspected_region": null,
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    },
+    "real-photo n_lsb=1 plain": {
+      "elements": 921600,
+      "whole_file_p": 2.6801460007032428e-186,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 56,
+      "windows_flagged": 11,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 196608
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167632
+      }
+    },
+    "real-photo n_lsb=1 enc": {
+      "elements": 921600,
+      "whole_file_p": 4.946599523411139e-187,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 56,
+      "windows_flagged": 11,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 196608
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167912
+      }
+    },
+    "real-photo n_lsb=2 plain": {
+      "elements": 921600,
+      "whole_file_p": 0.0,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 56,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83816
+      }
+    },
+    "real-photo n_lsb=2 enc": {
+      "elements": 921600,
+      "whole_file_p": 2e-323,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 56,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83956
+      }
+    },
+    "real-audio original": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2450,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 0,
+      "suspected_region": null,
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    },
+    "real-audio n_lsb=1 plain": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2450,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 10,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 180224
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167616
+      }
+    },
+    "real-audio n_lsb=1 enc": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2450,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 10,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 180224
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167896
+      }
+    },
+    "real-audio n_lsb=2 plain": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2440,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83808
+      }
+    },
+    "real-audio n_lsb=2 enc": {
+      "elements": 192226,
+      "whole_file_p": 2.33e-321,
+      "whole_file_df": 2453,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83948
+      }
+    },
+    "real-video original": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2450,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 0,
+      "suspected_region": null,
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    },
+    "real-video n_lsb=1 plain": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2450,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 10,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 180224
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167616
+      }
+    },
+    "real-video n_lsb=1 enc": {
+      "elements": 192226,
+      "whole_file_p": 3.932784512727e-312,
+      "whole_file_df": 2450,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 10,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 180224
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 167896
+      }
+    },
+    "real-video n_lsb=2 plain": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2440,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83808
+      }
+    },
+    "real-video n_lsb=2 enc": {
+      "elements": 192226,
+      "whole_file_p": 0.0,
+      "whole_file_df": 2461,
+      "window": 16384,
+      "windows_total": 11,
+      "windows_flagged": 6,
+      "suspected_region": {
+        "first_flagged_window_begin": 16384,
+        "last_flagged_window_end": 114688
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": {
+        "start": 20000,
+        "length": 83948
+      }
+    },
+    "bundled cover.png": {
+      "elements": 786432,
+      "whole_file_p": 0.9997307941367034,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 48,
+      "windows_flagged": 0,
+      "suspected_region": null,
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    },
+    "bundled image-short.stego.png": {
+      "elements": 786432,
+      "whole_file_p": 0.9997852615844571,
+      "whole_file_df": 127,
+      "window": 16384,
+      "windows_total": 48,
+      "windows_flagged": 1,
+      "suspected_region": {
+        "first_flagged_window_begin": 0,
+        "last_flagged_window_end": 16384
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    },
+    "bundled cover.wav": {
+      "elements": 220500,
+      "whole_file_p": 1.0,
+      "whole_file_df": 8183,
+      "window": 16384,
+      "windows_total": 13,
+      "windows_flagged": 0,
+      "suspected_region": null,
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    },
+    "bundled audio-short.stego.wav": {
+      "elements": 220500,
+      "whole_file_p": 1.0,
+      "whole_file_df": 8182,
+      "window": 16384,
+      "windows_total": 13,
+      "windows_flagged": 1,
+      "suspected_region": {
+        "first_flagged_window_begin": 0,
+        "last_flagged_window_end": 16384
+      },
+      "windows": [],
+      "ground_truth_embedded_elements": null
+    }
+  }
+}

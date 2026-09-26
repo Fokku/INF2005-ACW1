@@ -1,5 +1,44 @@
 # Limitations, ethics and AI use
 
+## Steganalysis of our own output
+
+_Author: Ke Ying (optional challenge). Script drafted with Claude Code assistance; the byte-phase test is our own design, not a published algorithm._
+
+`scripts/steganalysis.py demo` (log: `evidence/logs/steganalysis-demo.txt`, files:
+`evidence/steganalysis/`) audits stego objects made by `pipeline.protect` on
+synthetic, real-photo, real-audio and video covers, using 16384-element windows and no key,
+start offset or n_lsb knowledge. Two blind tests are combined:
+
+1. **Chi-square pairs-of-values** (Westfeld-Pfitzmann). LSB replacement equalises
+   the counts of (2k, 2k+1); a natural cover keeps them unequal.
+2. **Byte-phase test** (our own). The frame is byte-aligned ASCII/base64 JSON, so
+   the embedded bit-plane repeats with period 8/n_lsb elements and some phases are
+   biased (ASCII top bit is always 0). A homogeneity chi-square across phases is
+   uniform on a cover and collapses inside an embedded region.
+
+Results (`evidence/logs/steganalysis-demo.txt`, run with `--photo` and `--wav`; the real
+photo is a Windows wallpaper JPEG cropped to 640x480 and the real audio is a Windows
+system WAV, both used locally and not committed; the video cover is that same PCM
+inside an AVI, since the AVI cover embeds only in its PCM track): every unmodified
+cover raises 0 windows, and every stego file (n_lsb 1 and 2, plain and AES-encrypted)
+raises one contiguous run of windows that brackets the true embedded span, e.g.
+n_lsb=1 flagged 16384-196608 against a true 20000-187479, on synthetic photo, real
+photo, real audio and video. The bundled white-noise samples also work with the phase
+test (cover 0 windows, stego flags window 0, which holds the start-128 payload).
+
+- Textbook chi-square alone was **not** enough: our frame bits are not 50/50, so it
+  missed n_lsb=2 on images. On 16-bit audio it is useless, because natural 16-bit
+  audio LSBs are already random, so covers give p near 1. The reported region is
+  therefore decided by the byte-phase test only; chi-square is informational.
+- Constant bit-planes (silence, saturation) are skipped, otherwise silent audio
+  looked like an embedded region.
+- AES-GCM only encrypts the message, not the JSON/signature wrapper, so encryption
+  did not remove the structure the phase test exploits. This is a real weakness: the
+  wrapper's byte structure is visible to a blind attacker.
+- Limits of the evidence: one photo and one clip, not a corpus, so no false-positive
+  rate is claimed. Tampering to the embedded region was not separately analysed (the
+  verdict pipeline catches it).
+
 ## Technical limits
 
 - **Fragile embedding:** cropping, resampling, lossy compression and LSB scrubbing
@@ -7,7 +46,7 @@
   embedding scheme.
 - **Detectability:** public magic and contiguous LSB embedding are searchable.
   Keyed placement does not provide confidentiality or resistance to steganalysis.
-  No steganalysis evaluation has been completed as part of Section G.
+  See "Steganalysis of our own output" below for what we measured.
 - **Partial integrity:** the stable hash omits all selected low bits, including
   outside the payload. Eight LSBs on uint8 exclude all sample content. Authentic
   does not imply identical file bytes.
