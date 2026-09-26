@@ -249,9 +249,18 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
       is green (5/5).
   - [x] Wired through `pipeline.protect` / `pipeline.verify` (workstream E) — `cover_kind == "video"`
         is handled alongside image/audio in both directions.
-- [ ] **Robust embedding** — improve payload survival under compression, noise, resampling or
-      mild transformation, using redundancy, error correction (e.g. repetition or Hamming codes)
-      or spread-spectrum techniques. Document the trade-off against raw capacity.
+- [x] **Robust embedding** — `ecc.py` implements a repetition code: `pipeline.ProtectOptions
+      .redundancy` (default 1, off) embeds the frame's header and body as two separate blocks of
+      `redundancy` back-to-back copies each, and `extraction.extract_frame` majority-votes each
+      block back to one copy before handing it to the unmodified `container.parse_header`/
+      `parse_frame`. Redundancy=1 is byte-for-byte identical to before this existed — zero risk to
+      the rest of the pipeline. `tests/test_robust_embedding.py` proves the actual claim: a
+      localized attack that breaks verification at redundancy=1 is fully recovered at redundancy=3
+      (2 of 3 body copies survive), while wiping 2 of 3 copies, or a wrong redundancy guess in
+      either direction, correctly still fails. Trade-off: capacity cost is linear in `redundancy`
+      (3x frame size at redundancy=3). Not wired into the API/CLI/GUI yet — usable today via
+      `pipeline.protect`/`verify` and proven by pytest; exposing it as a Protect-tab option is a
+      natural follow-up.
 - [x] **Attack simulation module** — covered by workstream F (Kannon): tampering, payload
       corruption, LSB scrub, re-encode, crop and replay/substitution in `attacks.py`, with wrong key
       and wrong start location shown through Verify. Overlaps workstream F. Extend `attacks.py` beyond the six

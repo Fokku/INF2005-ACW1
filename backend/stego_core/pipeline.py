@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from . import (
     audio_codec,
     container,
+    ecc,
     extraction,
     hashing,
     image_codec,
@@ -46,6 +47,7 @@ class ProtectOptions:
     passphrase: str | None = None  # required for derived start and/or encryption
     explicit_start: int | None = None  # set this to use EXPLICIT mode
     encrypt_message: bool = False
+    redundancy: int = 1  # bonus robust embedding (spec Section 8): see ecc.py
 
 
 @dataclass
@@ -56,6 +58,7 @@ class ProtectOutcome:
     capacity_bytes: int
     payload_json: dict
     signature: bytes
+    redundancy: int = 1
 
 
 def _load_cover(cover_kind: str, cover_bytes: bytes):
@@ -169,16 +172,32 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
     payload_bytes = payload_mod.serialize(pl)
     signature = signing.sign(opts.private_key_pem, payload_bytes)
     frame = container.build_frame(payload_bytes, signature, opts.n_lsb, encrypted)
+    ecc.validate_redundancy(opts.redundancy)
 
     # Required demo case (spec Section 5): a blanket "does this even fit
     # anywhere" check, with a message that names the shortfall directly,
     # rather than letting a cryptic CapacityError surface from deep inside
-    # embed_bits for the common "message is too big" mistake.
+    # embed_bits for the common "message is too big" mistake. `redundancy`
+    # multiplies how many bits actually get embedded (see ecc.py). A
+    # frame that fits at redundancy=1 may legitimately stop fitting once
+    # asked to repeat itself several times over.
+    if opts.redundancy == 1:
+        total_frame_elements = -(-(len(frame) * 8) // opts.n_lsb)
+    else:
+        # Two separately rounded blocks (header, then body; see the
+        # embedding step below) can together need up to one more element
+        # than a single combined block of the same total bit length would,
+        # so account for the two ceilings here rather than one.
+        header_elements = -(-(container.HEADER_SIZE * 8 * opts.redundancy) // opts.n_lsb)
+        body_elements = -(-((len(frame) - container.HEADER_SIZE) * 8 * opts.redundancy) // opts.n_lsb)
+        total_frame_elements = header_elements + body_elements
+    total_frame_bits = total_frame_elements * opts.n_lsb
     total_capacity_bits = lsb.capacity_bits(n_elements, opts.n_lsb)
-    if len(frame) * 8 > total_capacity_bits:
+    if total_frame_bits > total_capacity_bits:
+        redundancy_note = f" at redundancy={opts.redundancy}" if opts.redundancy > 1 else ""
         raise CapacityError(
             f"payload does not fit: the frame needs {len(frame)} bytes "
-            f"({len(frame) * 8} bits) at n_lsb={opts.n_lsb}, but this cover only "
+            f"({total_frame_bits} bits{redundancy_note}) at n_lsb={opts.n_lsb}, but this cover only "
             f"has capacity for {total_capacity_bits // 8} bytes"
         )
 
@@ -200,14 +219,30 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
         )
 
     # FR7: raw capacity alone does not guarantee room after the selected start.
-    # Use the actual frame length here, not the derived-mode reservation.
+    # Use the actual frame length here (times redundancy), not the
+    # derived-mode reservation.
     try:
-        location.validate_start(n_elements, start, len(frame) * 8, opts.n_lsb)
+        location.validate_start(n_elements, start, total_frame_bits, opts.n_lsb)
     except ValueError as exc:
         raise StegoError(str(exc)) from exc
 
-    bits = lsb.bytes_to_bits(frame)
-    new_elements = lsb.embed_bits(elements, bits, start, opts.n_lsb)
+    if opts.redundancy == 1:
+        bits = lsb.bytes_to_bits(frame)
+        new_elements = lsb.embed_bits(elements, bits, start, opts.n_lsb)
+    else:
+        # Two separate repeated blocks (header, then body), not one repeated
+        # whole-frame block. extraction.extract_frame has to read and
+        # majority-vote the header before it knows the payload/signature
+        # lengths needed to size the body read, so each copy of the header
+        # has to sit at a fixed, frame-length-independent offset. See
+        # extraction.py's extract_frame docstring for the matching read side.
+        header_bits = ecc.repeat_bits(lsb.bytes_to_bits(frame[: container.HEADER_SIZE]), opts.redundancy)
+        body_bits = ecc.repeat_bits(lsb.bytes_to_bits(frame[container.HEADER_SIZE :]), opts.redundancy)
+        header_elements = -(-len(header_bits) // opts.n_lsb)
+        elements_with_header = lsb.embed_bits(elements, header_bits, start, opts.n_lsb)
+        new_elements = lsb.embed_bits(
+            elements_with_header, body_bits, start + header_elements, opts.n_lsb
+        )
     stego_bytes = _save_cover(opts.cover_kind, cover, new_elements)
 
     return ProtectOutcome(
@@ -217,6 +252,7 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
         capacity_bytes=total_capacity_bits // 8,
         payload_json=json.loads(payload_bytes),
         signature=signature,
+        redundancy=opts.redundancy,
     )
 
 
@@ -229,6 +265,7 @@ class VerifyOptions:
     media_id: str
     passphrase: str | None = None
     explicit_start: int | None = None
+    redundancy: int = 1  # must match the redundancy used at protect time; see ecc.py
 
 
 @dataclass
@@ -315,17 +352,33 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             outcome.error = "no passphrase or explicit start offset was supplied"
             return _give_up(outcome, None)
 
-        # A location must hold the magic before we can recognize a frame.
-        # If magic survives but the header is truncated, extraction reports
-        # a damaged frame instead of treating it as a wrong location.
+        # A location must hold the magic before we can recognize a frame. If
+        # redundancy > 1, `redundancy` copies of the whole header (not just
+        # the magic bytes) were embedded back to back as one block (see
+        # ecc.py and extraction.py's extract_frame). The copies of the
+        # 4-byte magic sit HEADER_SIZE bytes apart, not 4 bytes apart, so the
+        # full header block has to be read and majority-voted before the
+        # first 4 bytes can be compared to the magic constant. If magic
+        # survives but the header is truncated, extraction reports a damaged
+        # frame instead of treating it as a wrong location.
+        ecc.validate_redundancy(opts.redundancy)
+        magic_bits_needed = len(container.MAGIC) * 8 * opts.redundancy
+        header_bits_needed = container.HEADER_SIZE * 8 * opts.redundancy
+        read_bits_needed = magic_bits_needed if opts.redundancy == 1 else header_bits_needed
         try:
-            location.validate_start(n_elements, start, len(container.MAGIC) * 8, opts.n_lsb)
+            location.validate_start(n_elements, start, read_bits_needed, opts.n_lsb)
         except (ValueError, CapacityError) as exc:
             outcome.error = str(exc)
             return _give_up(outcome, start)
 
         # --- 3. Distinguish absent magic from a present but damaged frame -----------
-        magic_bits = lsb.extract_bits(elements, start, len(container.MAGIC) * 8, opts.n_lsb)
+        if opts.redundancy == 1:
+            magic_bits = lsb.extract_bits(elements, start, magic_bits_needed, opts.n_lsb)
+        else:
+            header_bits = ecc.majority_vote(
+                lsb.extract_bits(elements, start, header_bits_needed, opts.n_lsb), opts.redundancy
+            )
+            magic_bits = header_bits[: len(container.MAGIC) * 8]
         outcome.magic_at_expected_start = lsb.bits_to_bytes(magic_bits) == container.MAGIC
 
         if not outcome.magic_at_expected_start:
@@ -344,7 +397,7 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
 
         # --- 4. Read the rest of the frame ------------------------------------------
         try:
-            frame = extraction.extract_frame(elements, start, opts.n_lsb)
+            frame = extraction.extract_frame(elements, start, opts.n_lsb, redundancy=opts.redundancy)
             payload_bytes, signature = frame.payload_bytes, frame.signature
             frame_n_lsb = frame.n_lsb
             outcome.frame_parsed = True
