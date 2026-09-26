@@ -9,9 +9,10 @@ A GUI-based **LSB-replacement steganography** tool that protects a PNG image and
 > implements six PNG/WAV attacks, plus five AVI audio-track attacks (AVI crop is unsupported).
 > See [the Attack Lab design and demo guide](docs/design/attack-lab.md) for verdict conditions.
 > The curated `samples/` set and `scripts/make_samples.py` are done — see "Expected outputs" below.
-> What's left is the `stego` CLI (a rescue path if the web UI misbehaves; not required, since the GUI
-> and `scripts/make_samples.py` already cover every FR1–11 case), the party A → B email evidence,
-> and the submission admin (demo plan, declaration, contribution statement).
+> The `stego` CLI (a rescue path if the web UI misbehaves) is implemented — `keygen`, `capacity`,
+> `protect`, `verify`, `tamper` all work end to end against real PNG/WAV covers
+> (`backend/tests/test_cli.py`, 7/7 green). What's left is the party A → B email evidence, and the
+> submission admin (demo plan, declaration, contribution statement).
 > See [TODO.md](TODO.md) for the nine workstreams and [TECH_STACK.md](TECH_STACK.md) for the stack.
 >
 > Find your work with: `grep -rn "TODO(team)" backend frontend scripts`
@@ -29,7 +30,28 @@ Team number: `Px-x` (fill in).
 | Zong Han |
 | Kannon |
 
-Task ownership is not assigned yet. [TODO.md](TODO.md) lists every section and feature; the team will allocate them together.
+Task ownership by functional requirement, from the team's task-allocation document (cross-checked
+against the per-workstream owners already recorded in [TODO.md](TODO.md)):
+
+| FR | Owner |
+| --- | --- |
+| FR1 – Image input | Ke Ying |
+| FR2 – Audio input | Ke Ying |
+| FR3 – Payload generation | Wen Xuan |
+| FR4 – Digital signature | Wen Xuan |
+| FR5 – Image steganographic embedding | Zong Han |
+| FR6 – Audio steganographic embedding | Zong Han |
+| FR7 – Variable start location | Ridwan / Zong Han |
+| FR8 – Extraction and decoding | Ridwan / Zong Han |
+| FR9 – Hash verification | Ridwan / Zong Han |
+| FR10 – Verdict generation | Zong Han |
+| FR11 – Positive and negative cases | Kannan / Zong Han |
+| FR12 – Evidence and reproducibility | All |
+| FR13 – Innovation | Zong Han (start location), Kannan (attack lab) |
+
+> **Note:** "Ridwan" / "Kannan" above are the names used in the task-allocation document and in
+> `docs/design/*`; the member table lists "Wan" and "Kannon" respectively. Please confirm these
+> refer to the same two people before this goes into the submission.
 
 ## What the tool does
 
@@ -68,7 +90,9 @@ ACW1/
 ├── docs/
 │   ├── spec/            assignment specification (md + pdf)
 │   ├── design/          design notes: payload format, start location, verdict table, threat model, innovation, limitations & AI use
-│   └── demo-plan.md     25-minute demo sequence (to be written)
+│   ├── demo-plan.md     25-minute demo sequence (drafted; needs member names)
+│   ├── declaration-of-originality.md          template, needs signatures
+│   └── contribution-distribution-statement.md template, needs agreed percentages
 ├── keys/
 │   ├── public/          team public key(s) — tracked
 │   └── private/         demo-only private key — gitignored, never committed
@@ -160,7 +184,7 @@ everything above is reproducible locally but has not been demonstrated over a re
 ## Keys
 
 - The team's **public key** lives in `keys/public/` and is what a verifier (and the marker) uses.
-- The **private key** used for the demo is generated only for this assignment, kept in `keys/private/`, and is gitignored. `scripts/make_samples.py` generates the pair automatically the first time it runs (via `stego_core.signing.generate_keypair`) if `keys/private/team_ed25519.pem` doesn't already exist. Anyone cloning the repository can delete `keys/private/` and re-run the script for a fresh pair; the samples under `samples/` then regenerate and verify against the new public key. (`stego keygen` will do the same once the CLI is implemented — see `TODO.md` workstream E.)
+- The **private key** used for the demo is generated only for this assignment, kept in `keys/private/`, and is gitignored. `scripts/make_samples.py` generates the pair automatically the first time it runs (via `stego_core.signing.generate_keypair`) if `keys/private/team_ed25519.pem` doesn't already exist. Anyone cloning the repository can delete `keys/private/` and re-run the script for a fresh pair; the samples under `samples/` then regenerate and verify against the new public key. `stego keygen --out keys --label team` (see `backend/stego_core/cli.py`) does the same from the command line.
 
 ## Deadlines
 
@@ -178,6 +202,9 @@ Exact dates: to be confirmed by the team once the lab schedule is published.
 - [TODO.md](TODO.md) — every section and feature that has to be done, with spec references
 - [docs/spec/INF2005-ACW1-spec-v5.md](docs/spec/INF2005-ACW1-spec-v5.md) — the assignment specification
 - `docs/design/` — payload format, start location, extraction, hash verification, verdict table, threat model, attack lab, limitations and AI use
+- [docs/demo-plan.md](docs/demo-plan.md) — running order (needs names in the blanks)
+- [docs/declaration-of-originality.md](docs/declaration-of-originality.md) — template, needs signatures
+- [docs/contribution-distribution-statement.md](docs/contribution-distribution-statement.md) — template, needs agreed percentages
 
 ## Use of generative AI
 

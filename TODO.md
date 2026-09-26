@@ -89,7 +89,7 @@ from shape directly.
 
 ## E · End-to-end pipeline and API — `pipeline.py`, `app/routers/*`, `cli.py`
 
-Owner: Zong Han (pipeline + capacity/protect/verify routers done); Kannon (attack router done). CLI still open.
+Owner: Zong Han (pipeline + capacity/protect/verify routers done); Kannon (attack router done); CLI done.
 
 Do this after A–D. It is mostly plumbing.
 
@@ -99,8 +99,8 @@ Do this after A–D. It is mostly plumbing.
       (image, audio, and video covers)
 - [x] `capacity`, `protect`, `verify`, `keys` routers wired to the real pipeline/`signing` functions
 - [x] `attack` router / `attacks.py` — Kannon, see workstream F
-- [ ] Fill in the `stego` CLI commands: `keygen`, `capacity`, `protect`, `verify`, `tamper`
-      (`stego_core/cli.py` — every command still `raise NotImplementedError`)
+- [x] `stego` CLI commands: `keygen`, `capacity`, `protect`, `verify`, `tamper`
+      (`stego_core/cli.py`; `tests/test_cli.py` — 7/7 green, exercises real PNG/WAV covers)
 - [x] Make `tests/test_api.py::test_protect_then_verify_roundtrip` pass for image and audio
 
 Full backend suite is 629/629 green after FR11 evidence (`cd backend && python -m pytest -q`).
@@ -233,8 +233,11 @@ Can start now.
 
 - [ ] Fill in the team number (`Px-x`) and the exact Week 5 dates
 - [ ] Demo plan: ≤ 25 minutes, a slot for **every** member, who shows what and in what order
+      (running order and settings drafted in `docs/demo-plan.md`; the `______` name blanks are open)
 - [ ] Declaration of Originality, signed by all six
+      (template with a signature table drafted: `docs/declaration-of-originality.md`)
 - [ ] Contribution/distribution statement with percentages, agreed by all six
+      (template drafted with the FR-ownership starting point: `docs/contribution-distribution-statement.md`)
 - [x] Complete the README's "Expected outputs" section — every sample, its command, its verdict
 - [ ] Commit `keys/public/*.pem`; confirm no private key is in git history
 - [ ] Ship `frontend/dist` in the submission so the marker needs only Python

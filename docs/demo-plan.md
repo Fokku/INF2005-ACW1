@@ -53,8 +53,10 @@ assume `scripts/make_samples.py` has already been run once (see "Before the demo
   causes are a typo'd passphrase/media ID or a mismatched `n_lsb` between Protect and Verify —
   recheck those three fields first, out loud, as part of the demo narrative ("this is exactly the
   kind of mismatch the system is designed to catch") rather than treating it as a failure.
-- **`stego` CLI is not a real fallback**: unlike what earlier drafts of this doc assumed, every
-  `stego` CLI command (`keygen`/`capacity`/`protect`/`verify`/`tamper`) is still unimplemented as of
-  this writing. If the browser truly breaks, the actual rescue path is the pre-generated files in
-  `samples/` (already verified to their correct verdicts in `evidence/logs/sample-manifest.json`),
-  not a CLI escape hatch. Check `TODO.md` before the demo in case someone has since implemented it.
+- **Browser truly breaks**: the `stego` CLI (`keygen`/`capacity`/`protect`/`verify`/`tamper`, see
+  `backend/stego_core/cli.py`, tested in `backend/tests/test_cli.py`) is now a real fallback — e.g.
+  `python -m stego_core.cli verify --stego samples/image/stego/image-short.stego.png --pub keys/public/team_ed25519.pub.pem --lsb 2 --media-id <id> --start 128`
+  prints the verdict as JSON and exits non-zero for anything but Authentic. The pre-generated files
+  in `samples/` (already verified to their correct verdicts in `evidence/logs/sample-manifest.json`)
+  remain the fastest fallback since they need no typing on stage; the CLI is the next resort if a
+  fresh cover/message needs to be run through the pipeline without the GUI.
