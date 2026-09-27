@@ -46,6 +46,8 @@ async def run_attack(
             output = attacks.reencode(data, kind.value)
         elif attack == AttackKind.corrupt_payload:
             output = attacks.corrupt_payload(data, kind.value, n_lsb, start_offset)
+        elif attack == AttackKind.lsb_noise:
+            output = attacks.lsb_noise(data, kind.value, n_lsb)
         else:
             if other_cover is None:
                 raise ValueError("a second cover is required for replay")

@@ -54,7 +54,9 @@ export function ReportPanel({ report }: { report: VerifyReport }) {
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <Exhibit label="File">{report.stego.filename}</Exhibit>
         <Exhibit label="File SHA-256">{report.stego.sha256}</Exhibit>
-        <Exhibit label="Read with">{report.n_lsb} LSB</Exhibit>
+        <Exhibit label="Read with">
+          {report.n_lsb} LSB, {report.redundancy} {report.redundancy === 1 ? 'copy' : 'copies'}
+        </Exhibit>
       </div>
     </div>
   )

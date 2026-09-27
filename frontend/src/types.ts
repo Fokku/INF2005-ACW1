@@ -25,6 +25,7 @@ export type AttackKind =
   | 'reencode'
   | 'corrupt_payload'
   | 'replay'
+  | 'lsb_noise'
 
 export interface ImageInfo {
   width: number
@@ -83,6 +84,8 @@ export interface CapacityReport {
   max_message_bytes: number
   payload_bytes?: number | null
   fits?: boolean | null
+  /** Copies of the frame that will be embedded (robust embedding). */
+  redundancy: number
 }
 
 export interface PayloadInfo {
@@ -116,6 +119,8 @@ export interface ProtectResult {
   diff?: FileRef | null
   changed_elements?: number | null
   psnr_db?: number | null
+  /** Copies of the frame that were embedded. */
+  redundancy: number
 }
 
 export interface VerifyReport {
@@ -131,6 +136,8 @@ export interface VerifyReport {
   media_hash_recomputed?: string | null
   hash_match?: boolean | null
   payload?: PayloadInfo | null
+  /** Copies of the frame the verifier expected. */
+  redundancy: number
 }
 
 export interface AttackResult {

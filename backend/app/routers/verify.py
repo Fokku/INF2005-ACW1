@@ -10,7 +10,7 @@ import base64
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from stego_core import hashing, pipeline
+from stego_core import ecc, hashing, pipeline
 from stego_core.errors import UnsupportedCoverError
 
 from .. import storage
@@ -37,6 +37,7 @@ async def verify(
     start_mode: StartMode = Form(StartMode.derived),
     explicit_start: int | None = Form(None),
     passphrase: str | None = Form(None),
+    redundancy: int = Form(1, description="copies of the frame party A embedded: 1 (off), 3, 5, 7 or 9"),
 ) -> VerifyReport:
     """Judge a file and explain the judgement.
 
@@ -46,6 +47,10 @@ async def verify(
     """
     if start_mode == StartMode.explicit and explicit_start is None:
         raise HTTPException(status_code=400, detail="explicit start mode requires an explicit_start offset")
+    try:
+        ecc.validate_redundancy(redundancy)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     stego_bytes = await stego.read()
 
@@ -82,6 +87,7 @@ async def verify(
         media_id=media_id,
         passphrase=passphrase or None,
         explicit_start=explicit_start if start_mode == StartMode.explicit else None,
+        redundancy=redundancy,
     )
     outcome = pipeline.verify(opts)
 
@@ -150,4 +156,5 @@ async def verify(
         media_hash_recomputed=outcome.media_hash_recomputed,
         hash_match=hash_match,
         payload=payload_info,
+        redundancy=redundancy,
     )

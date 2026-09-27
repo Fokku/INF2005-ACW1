@@ -66,10 +66,15 @@ function form(fields: Record<string, string | number | boolean | File | null | u
 export const api = {
   health: () => request<HealthResponse>('/api/health'),
 
-  capacity: (args: { cover: File; nLsb: number; payloadBytes?: number }) =>
+  capacity: (args: { cover: File; nLsb: number; payloadBytes?: number; redundancy: number }) =>
     request<CapacityReport>('/api/capacity', {
       method: 'POST',
-      body: form({ cover: args.cover, n_lsb: args.nLsb, payload_bytes: args.payloadBytes }),
+      body: form({
+        cover: args.cover,
+        n_lsb: args.nLsb,
+        payload_bytes: args.payloadBytes,
+        redundancy: args.redundancy,
+      }),
     }),
 
   protect: (args: {
@@ -85,6 +90,7 @@ export const api = {
     passphrase?: string
     encryptMessage: boolean
     privateKeyPem?: File
+    redundancy: number
   }) =>
     request<ProtectResult>('/api/protect', {
       method: 'POST',
@@ -101,6 +107,7 @@ export const api = {
         passphrase: args.passphrase,
         encrypt_message: args.encryptMessage,
         private_key_pem: args.privateKeyPem,
+        redundancy: args.redundancy,
       }),
     }),
 
@@ -113,6 +120,7 @@ export const api = {
     startMode: StartMode
     explicitStart?: number
     passphrase?: string
+    redundancy: number
   }) =>
     request<VerifyReport>('/api/verify', {
       method: 'POST',
@@ -125,6 +133,7 @@ export const api = {
         start_mode: args.startMode,
         explicit_start: args.explicitStart,
         passphrase: args.passphrase,
+        redundancy: args.redundancy,
       }),
     }),
 

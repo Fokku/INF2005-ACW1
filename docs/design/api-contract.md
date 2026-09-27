@@ -34,3 +34,22 @@ The earlier API evidence supplied a passphrase directly and did not exercise the
 hidden GUI input or misleading encrypted/decrypted badge. It was insufficient to
 establish that the GUI decryption workflow worked. The older archived manifest
 records that historical API run; it is not regenerated or presented as post-fix evidence.
+
+# Robust embedding (number of copies)
+
+`/api/capacity`, `/api/protect` and `/api/verify` accept an optional `redundancy`
+form field: how many copies of the frame are embedded (see `stego_core/ecc.py`).
+It must be an odd number from 1 to 9 (400 otherwise) and defaults to 1, which is
+the original single-copy behaviour. Like the LSB count, party B must send the same
+value party A used.
+
+| Response | Field | Meaning |
+| --- | --- | --- |
+| `CapacityReport` | `redundancy` | Copies counted; `fits` and `max_message_bytes` assume that many copies |
+| `ProtectResult` | `redundancy` | Copies that were embedded |
+| `VerifyReport` | `redundancy` | Copies the verifier expected |
+
+The GUI shows a "Copies embedded" selector (1/3/5) on Protect and Verify. The Attack
+Lab's `lsb_noise` attack flips 0.1% of the hidden low bits without changing the
+visible content: a 1-copy file then verifies as Tampered, a 3- or 5-copy file still
+verifies as Authentic. `backend/tests/test_robust_embedding_api.py` covers this flow.

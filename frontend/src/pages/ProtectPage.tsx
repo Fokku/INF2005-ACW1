@@ -10,6 +10,7 @@ import { AudioCompare } from '../components/AudioCompare'
 import { VideoCompare } from '../components/VideoCompare'
 import { LsbSelector } from '../components/LsbSelector'
 import { ErrorNotice } from '../components/NotImplemented'
+import { RedundancySelector } from '../components/RedundancySelector'
 import { StartLocationPanel } from '../components/StartLocationPanel'
 import { StepSection } from '../components/StepSection'
 import { SAMPLE_PAYLOADS } from '../lib/samplePayloads'
@@ -35,6 +36,7 @@ export function ProtectPage() {
   const [passphrase, setPassphrase] = useState('')
   const [explicitStart, setExplicitStart] = useState(1024)
   const [encrypt, setEncrypt] = useState(false)
+  const [redundancy, setRedundancy] = useState(1)
 
   const [capacityData, setCapacityData] = useState<CapacityReport | null>(null)
   const [result, setResult] = useState<ProtectResult | null>(null)
@@ -53,13 +55,13 @@ export function ProtectPage() {
   // it here avoids resetting state from inside the effect below.
   const capacity = cover ? capacityData : null
 
-  // Re-check capacity whenever the cover or the LSB count changes, so the user
-  // sees "this will not fit" before pressing Protect.
+  // Re-check capacity whenever the cover, the LSB count or the number of copies
+  // changes, so the user sees "this will not fit" before pressing Protect.
   useEffect(() => {
     if (!cover) return
     let cancelled = false
     api
-      .capacity({ cover, nLsb, payloadBytes: messageBytes })
+      .capacity({ cover, nLsb, payloadBytes: messageBytes, redundancy })
       .then((report) => {
         if (!cancelled) setCapacityData(report)
       })
@@ -69,7 +71,7 @@ export function ProtectPage() {
     return () => {
       cancelled = true
     }
-  }, [cover, nLsb, messageBytes])
+  }, [cover, nLsb, messageBytes, redundancy])
 
   async function onProtect() {
     if (!cover) return
@@ -90,6 +92,7 @@ export function ProtectPage() {
           passphrase: passphrase || undefined,
           encryptMessage: encrypt,
           privateKeyPem: privateKey ?? undefined,
+          redundancy,
         }),
       )
     } catch (err) {
@@ -157,6 +160,7 @@ export function ProtectPage() {
 
         <StepSection num="3" title="Embedding settings">
           <LsbSelector value={nLsb} onChange={setNLsb} />
+          <RedundancySelector value={redundancy} onChange={setRedundancy} />
           <CapacityMeter report={capacity} messageBytes={messageBytes} />
           <StartLocationPanel
             showEncryptionPassphrase={encrypt}
@@ -213,8 +217,11 @@ export function ProtectPage() {
                     element {result.start_offset.toLocaleString()} ({result.start_mode})
                   </Exhibit>
                   <Exhibit label="Frame size">{result.frame_bytes} bytes</Exhibit>
+                  <Exhibit label="Copies embedded">
+                    {result.redundancy === 1 ? '1 (robust embedding off)' : result.redundancy}
+                  </Exhibit>
                   <Exhibit label="Capacity used">
-                    {((result.frame_bytes / result.capacity_bytes) * 100).toFixed(2)}%
+                    {(((result.frame_bytes * result.redundancy) / result.capacity_bytes) * 100).toFixed(2)}%
                   </Exhibit>
                   <Exhibit label="Media hash">{result.payload.media_hash}</Exhibit>
                   <Exhibit label="Signature">{result.signature_b64}</Exhibit>

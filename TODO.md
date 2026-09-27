@@ -258,9 +258,11 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
       localized attack that breaks verification at redundancy=1 is fully recovered at redundancy=3
       (2 of 3 body copies survive), while wiping 2 of 3 copies, or a wrong redundancy guess in
       either direction, correctly still fails. Trade-off: capacity cost is linear in `redundancy`
-      (3x frame size at redundancy=3). Not wired into the API/CLI/GUI yet — usable today via
-      `pipeline.protect`/`verify` and proven by pytest; exposing it as a Protect-tab option is a
-      natural follow-up.
+      (3x frame size at redundancy=3). In the GUI: a "Copies embedded" selector (1/3/5) on Protect
+      and Verify, the capacity meter counts every copy, and the Attack Lab's `lsb_noise` attack
+      flips 0.1% of the hidden low bits. Demo: 1 copy + `lsb_noise` gives Tampered, 3 or 5 copies
+      + `lsb_noise` still gives Authentic (`tests/test_robust_embedding_api.py`). Honest limit:
+      JPEG re-encoding or audio resampling defeats every copy, since they rewrite all low bits.
 - [x] **Attack simulation module** — covered by workstream F (Kannon): tampering, payload
       corruption, LSB scrub, re-encode, crop and replay/substitution in `attacks.py`, with wrong key
       and wrong start location shown through Verify. Overlaps workstream F. Extend `attacks.py` beyond the six

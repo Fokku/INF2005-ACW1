@@ -52,6 +52,7 @@ class AttackKind(str, Enum):
     reencode = "reencode"  # PNG->JPEG->PNG or WAV resample         -> Payload Missing
     corrupt_payload = "corrupt_payload"  # flip bits inside the embedded frame -> Tampered / Signature Invalid
     replay = "replay"  # transplant the frame into another cover    -> Tampered
+    lsb_noise = "lsb_noise"  # flip a few hidden low bits at random -> Tampered at 1 copy, Authentic at 3+
 
 
 # --------------------------------------------------------------------------- #
@@ -135,7 +136,12 @@ class CapacityReport(BaseModel):
     payload_bytes: int | None = Field(
         default=None, description="size of the message the user wants to embed, if given"
     )
-    fits: bool | None = Field(default=None, description="payload_bytes + overhead <= capacity_bytes")
+    fits: bool | None = Field(
+        default=None, description="(payload_bytes + overhead) * redundancy <= capacity_bytes"
+    )
+    redundancy: int = Field(
+        default=1, description="copies of the frame that will be embedded (robust embedding, see ecc.py)"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -199,6 +205,7 @@ class ProtectResult(BaseModel):
     )
     changed_elements: int | None = None
     psnr_db: float | None = None
+    redundancy: int = Field(default=1, description="copies of the frame that were embedded")
 
 
 class VerifyReport(BaseModel):
@@ -214,6 +221,7 @@ class VerifyReport(BaseModel):
     media_hash_recomputed: str | None = None
     hash_match: bool | None = None
     payload: PayloadInfo | None = None
+    redundancy: int = Field(default=1, description="copies of the frame the verifier expected")
 
 
 class AttackResult(BaseModel):
