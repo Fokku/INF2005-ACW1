@@ -16,3 +16,10 @@ export function formatDuration(seconds: number): string {
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
 }
+
+/** A p-value for display: exponent form when tiny, never NaN. */
+export function formatP(p: number | null): string {
+  if (p === null) return 'n/a'
+  if (p === 0) return '< 1e-300'
+  return p < 1e-3 ? p.toExponential(1) : p.toFixed(4)
+}

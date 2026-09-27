@@ -1,9 +1,39 @@
 /* Tailwind CSS v4 is configured in CSS, not in a JS config file.
    There is no tailwind.config.js and no PostCSS step: the @tailwindcss/vite
    plugin in vite.config.ts does everything. */
-@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Condensed:wght@700;900&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Martian+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 @plugin 'daisyui';
+
+/* Fonts are bundled (src/assets/fonts), never fetched from a CDN: the lab PC may
+   have no internet on demo day. See src/assets/fonts/README.md. */
+@font-face {
+  font-family: 'Big Shoulders';
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+  src: url('./assets/fonts/big-shoulders-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Public Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./assets/fonts/public-sans-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Public Sans';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/public-sans-italic-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Martian Mono';
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url('./assets/fonts/martian-mono-latin.woff2') format('woff2');
+}
 
 /* Case-file theme: see docs/design/gui-design.md for the full rationale.
    Dark, ink/slate base (tinted blue-slate, h≈250), one amber "stamp-ink"
@@ -48,7 +78,7 @@
 
 /* --- Type system: stamp / body / exhibit, see docs/design/gui-design.md §1 --- */
 @theme {
-  --font-stamp: 'Big Shoulders Condensed', ui-sans-serif, system-ui, sans-serif;
+  --font-stamp: 'Big Shoulders', ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
   --font-exhibit: 'Martian Mono', ui-monospace, monospace;
 
@@ -69,6 +99,10 @@ body {
    tightening. */
 .font-stamp {
   font-family: var(--font-stamp);
+  font-weight: 700;
+  /* Pin the display optical size: that is the condensed, stamped cut. Left to
+     auto, small labels would get the wide text cut instead. */
+  font-variation-settings: 'opsz' 72;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }

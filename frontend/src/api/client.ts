@@ -1,10 +1,6 @@
 /**
- * Thin fetch wrapper around the FastAPI backend.
- *
- * This file is COMPLETE. Every function already sends the right request; they
- * return 501 today only because the backend core is unimplemented. When a
- * teammate fills in a stego_core function, the matching screen starts working
- * with no change here.
+ * Thin fetch wrapper around the FastAPI backend. One function per endpoint;
+ * multipart form fields use the backend's snake_case names.
  */
 
 import type {
@@ -13,11 +9,15 @@ import type {
   AttackKindInfo,
   AttackResult,
   CapacityReport,
+  FileRef,
   HealthResponse,
   KeyInfo,
   KeyPairResult,
   ProtectResult,
+  PublicKeyFile,
+  SampleCase,
   StartMode,
+  SteganalysisReport,
   VerifyReport,
 } from '../types'
 
@@ -66,7 +66,13 @@ function form(fields: Record<string, string | number | boolean | File | null | u
 export const api = {
   health: () => request<HealthResponse>('/api/health'),
 
-  capacity: (args: { cover: File; nLsb: number; payloadBytes?: number; redundancy: number }) =>
+  capacity: (args: {
+    cover: File
+    nLsb: number
+    payloadBytes?: number
+    redundancy: number
+    sealFrame?: boolean
+  }) =>
     request<CapacityReport>('/api/capacity', {
       method: 'POST',
       body: form({
@@ -74,6 +80,7 @@ export const api = {
         n_lsb: args.nLsb,
         payload_bytes: args.payloadBytes,
         redundancy: args.redundancy,
+        seal_frame: args.sealFrame,
       }),
     }),
 
@@ -91,6 +98,7 @@ export const api = {
     encryptMessage: boolean
     privateKeyPem?: File
     redundancy: number
+    sealFrame: boolean
   }) =>
     request<ProtectResult>('/api/protect', {
       method: 'POST',
@@ -108,6 +116,7 @@ export const api = {
         encrypt_message: args.encryptMessage,
         private_key_pem: args.privateKeyPem,
         redundancy: args.redundancy,
+        seal_frame: args.sealFrame,
       }),
     }),
 
@@ -145,6 +154,7 @@ export const api = {
     nLsb: number
     startOffset: number
     otherCover?: File
+    sealed?: boolean
   }) =>
     request<AttackResult>('/api/attack', {
       method: 'POST',
@@ -154,6 +164,7 @@ export const api = {
         n_lsb: args.nLsb,
         start_offset: args.startOffset,
         other_cover: args.otherCover,
+        sealed: args.sealed,
       }),
     }),
 
@@ -167,4 +178,30 @@ export const api = {
       method: 'POST',
       body: form({ public_key_pem: publicKeyPem }),
     }),
+
+  publicKeys: () => request<PublicKeyFile[]>('/api/keys/public'),
+
+  samples: () => request<SampleCase[]>('/api/samples'),
+
+  /** An AVI's PCM audio track as a WAV the browser can play (display only). */
+  audioTrack: (file: File) =>
+    request<FileRef>('/api/preview/audio-track', { method: 'POST', body: form({ file }) }),
+
+  steganalysis: (args: { file: File; window: number }) =>
+    request<SteganalysisReport>('/api/steganalysis', {
+      method: 'POST',
+      body: form({ file: args.file, window: args.window }),
+    }),
+}
+
+/**
+ * Fetch a file the backend serves (a stego output, an attack output, a sample)
+ * as a File, so it can be handed to another tab exactly as if it had been
+ * picked from disk. Bytes are copied untouched — no canvas, no decoding.
+ */
+export async function fetchAsFile(url: string, filename: string, mime?: string): Promise<File> {
+  const response = await fetch(url)
+  if (!response.ok) throw new ApiError(response.status, { error: 'http_error', detail: response.statusText })
+  const blob = await response.blob()
+  return new File([blob], filename, { type: mime ?? blob.type })
 }

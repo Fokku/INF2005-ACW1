@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Exhibit } from './Exhibit'
 import { Field } from './Field'
 import { formatBytes } from '../lib/format'
@@ -6,7 +6,11 @@ import { sha256File } from '../lib/hash'
 
 /**
  * File input with drag-and-drop, size readout and an optional SHA-256 chip.
- * Complete — no TODO.
+ *
+ * The hash follows the `file` prop, not just the user's own picks, so a file
+ * handed over from another tab (Protect → Verify, Attack Lab → Verify, a demo
+ * sample) gets its chip too. `onHash` reports it so a page can compare it with
+ * the hash party A read out.
  */
 export function FilePicker({
   label,
@@ -15,6 +19,7 @@ export function FilePicker({
   file,
   onChange,
   showHash = false,
+  onHash,
 }: {
   label: string
   accept: string
@@ -22,15 +27,35 @@ export function FilePicker({
   file: File | null
   onChange: (file: File | null) => void
   showHash?: boolean
+  onHash?: (sha256: string | null) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [hash, setHash] = useState<string | null>(null)
+  const [hashed, setHashed] = useState<{ file: File; sha256: string } | null>(null)
+  // Only trust a digest computed for the file currently shown.
+  const hash = file && hashed?.file === file ? hashed.sha256 : null
 
-  async function select(next: File | null) {
+  useEffect(() => {
+    if (!file || !showHash) {
+      onHash?.(null)
+      return
+    }
+    let cancelled = false
+    void sha256File(file).then((sha256) => {
+      if (cancelled) return
+      setHashed({ file, sha256 })
+      onHash?.(sha256)
+    })
+    return () => {
+      cancelled = true
+    }
+    // onHash is a callback prop; re-running when a parent re-renders would rehash for nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, showHash])
+
+  function select(next: File | null) {
     onChange(next)
-    setHash(null)
-    if (next && showHash) setHash(await sha256File(next))
+    if (inputRef.current) inputRef.current.value = ''
   }
 
   return (
@@ -44,7 +69,7 @@ export function FilePicker({
         onDrop={(e) => {
           e.preventDefault()
           setDragging(false)
-          void select(e.dataTransfer.files[0] ?? null)
+          select(e.dataTransfer.files[0] ?? null)
         }}
         onClick={() => inputRef.current?.click()}
         className={`relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border-2 border-dashed p-4 text-center transition-colors ${
@@ -59,7 +84,7 @@ export function FilePicker({
               title="Clear"
               onClick={(e) => {
                 e.stopPropagation()
-                void select(null)
+                select(null)
               }}
               className="border-base-300 text-base-content/60 hover:border-error hover:text-error hover:bg-error/10 absolute top-2 right-2 flex size-6 items-center justify-center rounded-sm border text-sm leading-none transition-colors"
             >
@@ -81,7 +106,7 @@ export function FilePicker({
         type="file"
         accept={accept}
         className="hidden"
-        onChange={(e) => void select(e.target.files?.[0] ?? null)}
+        onChange={(e) => select(e.target.files?.[0] ?? null)}
       />
 
       {showHash && hash && (

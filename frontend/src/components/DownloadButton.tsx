@@ -13,9 +13,20 @@ import { Exhibit } from './Exhibit'
  *
  * Complete — no TODO.
  */
-export function DownloadButton({ file, label }: { file: FileRef; label?: string }) {
+export function DownloadButton({
+  file,
+  label,
+  tone = 'ready',
+}: {
+  file: FileRef
+  label?: string
+  /** 'damaged' for Attack Lab output: a download, but not a success. */
+  tone?: 'ready' | 'damaged'
+}) {
+  const box =
+    tone === 'ready' ? 'border-verdict-authentic bg-verdict-authentic/10' : 'border-verdict-tampered bg-verdict-tampered/10'
   return (
-    <div className="border-verdict-authentic bg-verdict-authentic/10 space-y-3 rounded-sm border p-4">
+    <div className={`${box} space-y-3 rounded-sm border p-4`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-medium">{label ?? 'Stego object ready'}</div>
