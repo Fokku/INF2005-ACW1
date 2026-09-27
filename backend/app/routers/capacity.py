@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from stego_core import audio_codec, container, ecc, hashing, image_codec, lsb, signing, video_codec
+from stego_core import audio_codec, container, ecc, hashing, image_codec, lsb, sealing, signing, video_codec
 from stego_core.errors import UnsupportedCoverError
 
 from ..schemas import AudioInfo, CapacityReport, CoverInfo, CoverKind, ImageInfo, VideoInfo
@@ -85,6 +85,7 @@ async def check_capacity(
     n_lsb: int = Form(1, ge=1, le=8),
     payload_bytes: int | None = Form(None, description="size of the message the user wants to hide"),
     redundancy: int = Form(1, description="copies of the frame that will be embedded"),
+    seal_frame: bool = Form(False, description="the frame will be sealed (adds a 12-byte nonce per copy)"),
 ) -> CapacityReport:
     """Report how much this cover can hold, and whether the message fits."""
     try:
@@ -101,13 +102,19 @@ async def check_capacity(
     capacity_bytes = capacity_bits // 8
 
     fixed_frame_bytes = container.frame_size_bytes(0, signing.SIGNATURE_BYTES) + PAYLOAD_JSON_OVERHEAD_BYTES
+    if seal_frame:
+        # A sealed frame is nonce || AES-CTR(frame): exactly SEAL_OVERHEAD more
+        # bytes, embedded once per copy like the rest of the header block.
+        fixed_frame_bytes += sealing.SEAL_OVERHEAD
 
     # "Largest message" is a standalone figure independent of what's currently
     # typed: invert the base64 ratio (raw = 3/4 of its encoded size) rather
     # than treating the message as going in byte-for-byte.
     # With robust embedding the whole frame is written `redundancy` times, so
     # each copy only gets 1/redundancy of the cover.
-    max_message_bytes = max(0, ((capacity_bytes // redundancy - fixed_frame_bytes) * 3) // 4)
+    # base64 emits whole 4-byte groups, each carrying 3 raw bytes, so round the
+    # room down to whole groups first; `fits` below then agrees at the boundary.
+    max_message_bytes = max(0, 3 * ((capacity_bytes // redundancy - fixed_frame_bytes) // 4))
 
     frame_overhead_bytes = fixed_frame_bytes
     fits = None

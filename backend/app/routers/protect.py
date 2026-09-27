@@ -1,7 +1,7 @@
 """Protect: embed a signed verification payload into a cover object.
 
 Covers steps 1-6 of the required security workflow (spec Section 7) and
-FR3, FR4, FR5, FR6, FR7.
+FR3, FR4, FR5, FR6, FR7, plus the optional sealed frame (stego_core/sealing.py).
 """
 
 from __future__ import annotations
@@ -9,9 +9,10 @@ from __future__ import annotations
 import base64
 import json
 
+from cryptography.hazmat.primitives import serialization
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from stego_core import ecc, image_codec, pipeline
+from stego_core import ecc, image_codec, pipeline, signing
 
 from .. import storage
 from ..schemas import CoverKind, FileRef, PayloadInfo, ProtectResult, StartMode
@@ -20,6 +21,19 @@ from .capacity import _cover_info, _decode_cover, _sniff_kind
 router = APIRouter()
 
 _SUFFIX = {CoverKind.image: ".png", CoverKind.audio: ".wav", CoverKind.video: ".avi"}
+
+
+def _signer_public_pem(private_pem: bytes) -> bytes:
+    """SPKI PEM of the key that just signed, in the same form signing.generate_keypair writes.
+
+    Only called after pipeline.protect succeeded, so the key has already been
+    loaded and checked to be Ed25519 by signing.sign.
+    """
+    private_key = serialization.load_pem_private_key(private_pem, password=None)
+    return private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
 
 
 @router.post("/protect", response_model=ProtectResult)
@@ -37,6 +51,9 @@ async def protect(
     encrypt_message: bool = Form(False),
     private_key_pem: UploadFile | None = File(None),
     redundancy: int = Form(1, description="copies of the frame to embed: 1 (off), 3, 5, 7 or 9"),
+    seal_frame: bool = Form(
+        False, description="encrypt the whole frame (AES-256-CTR) so no plaintext magic/header is embedded"
+    ),
 ) -> ProtectResult:
     """Embed and sign, then return the stego file plus everything the demo needs
     to explain what happened.
@@ -47,6 +64,14 @@ async def protect(
         ecc.validate_redundancy(redundancy)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if seal_frame and not passphrase:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "seal_frame requires a passphrase: the frame is encrypted with a key derived from it, "
+                "and the verifier needs the same passphrase and media ID to find the payload at all"
+            ),
+        )
 
     cover_bytes = await cover.read()
     kind = _sniff_kind(cover.filename or "")
@@ -80,8 +105,10 @@ async def protect(
         explicit_start=explicit_start if start_mode == StartMode.explicit else None,
         encrypt_message=encrypt_message,
         redundancy=redundancy,
+        seal_frame=seal_frame,
     )
     outcome = pipeline.protect(opts)
+    signer_public_pem = _signer_public_pem(private_key_bytes)
 
     base_name = (cover.filename or "cover").rsplit(".", 1)[0]
     stego_ref = FileRef(**storage.save(outcome.stego_bytes, f"{base_name}.stego{_SUFFIX[kind]}"))
@@ -125,4 +152,7 @@ async def protect(
         capacity_bytes=outcome.capacity_bytes,
         diff=diff_ref,
         redundancy=outcome.redundancy,
+        sealed=outcome.sealed,
+        signer_public_key_pem=signer_public_pem.decode("ascii"),
+        signer_fingerprint=signing.fingerprint(signer_public_pem),
     )

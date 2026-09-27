@@ -1,4 +1,14 @@
-"""Controlled media attacks; EXPECTED describes the documented demo conditions."""
+"""Controlled media attacks; EXPECTED describes the documented demo conditions.
+
+Sealed frames (`sealing.py`): the attacks that never look at the frame
+(flip_bits, crop, lsb_scrub, reencode, lsb_noise) work on sealed files
+unchanged. corrupt_payload and replay normally parse the plaintext header to
+find the payload and the frame length. A sealed header is encrypted, and an
+attacker without the passphrase cannot tell a sealed frame from an empty
+cover, so neither attack can auto-detect one. Both take `sealed=True` for a
+key-less variant instead (CLI: `stego tamper --sealed`); without it they fail
+on a sealed file with a FrameError that says why.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +19,8 @@ from dataclasses import replace
 import numpy as np
 from PIL import Image
 
-from . import audio_codec, container, extraction, image_codec, lsb, video_codec
-from .errors import FrameError, UnsupportedCoverError
+from . import audio_codec, container, extraction, image_codec, location, lsb, sealing, video_codec
+from .errors import CapacityError, FrameError, UnsupportedCoverError
 from .verdict import Verdict
 
 EXPECTED = {
@@ -55,6 +65,39 @@ def _save(cover, elements, kind: str) -> bytes:
 def _frame(elements, n_lsb: int, start: int) -> bytes:
     frame = extraction.extract_frame(elements, start, n_lsb)
     return container.build_frame(frame.payload_bytes, frame.signature, frame.n_lsb, frame.encrypted)
+
+
+def _magic_absent_at(elements, n_lsb: int, start: int) -> bool:
+    """True only if `start` is readable and does not hold the plaintext MAGIC."""
+    magic_bits = len(container.MAGIC) * 8
+    try:
+        location.validate_start(len(elements), start, magic_bits, n_lsb)
+    except (CapacityError, ValueError):
+        return False
+    return lsb.bits_to_bytes(lsb.extract_bits(elements, start, magic_bits, n_lsb)) != container.MAGIC
+
+
+def _plaintext_frame(elements, n_lsb: int, start: int, attack: str) -> bytes:
+    """`_frame`, with an explanation when the file may hold a sealed frame."""
+    try:
+        return _frame(elements, n_lsb, start)
+    except FrameError as exc:
+        if not _magic_absent_at(elements, n_lsb, start):
+            raise  # out of range, or a damaged plaintext frame: the original error says it all
+        raise FrameError(
+            f"{exc}. No plaintext frame header at start {start}. If this file was protected with a "
+            f"sealed frame, its header is encrypted and opaque to {attack} without the passphrase; "
+            f"run the key-less sealed variant instead (CLI: stego tamper --attack {attack} --sealed)."
+        ) from exc
+
+
+def _sealed_region_bits(elements, n_lsb: int, start: int, n_bits: int):
+    """Read `n_bits` hidden bits from `start`, as a FrameError if they do not fit."""
+    try:
+        location.validate_start(len(elements), start, n_bits, n_lsb)
+    except CapacityError as exc:
+        raise FrameError("the sealed region extends past the end of the cover") from exc
+    return lsb.extract_bits(elements, start, n_bits, n_lsb)
 
 
 def flip_bits(data: bytes, kind: str, region: tuple[int, int] | None = None) -> bytes:
@@ -148,10 +191,26 @@ def reencode(data: bytes, kind: str) -> bytes:
     return _save(cover, elements, kind)
 
 
-def corrupt_payload(data: bytes, kind: str, n_lsb: int, start: int) -> bytes:
-    """Corrupt the first payload bit, preserving magic/header and the old CRC."""
+def corrupt_payload(data: bytes, kind: str, n_lsb: int, start: int, *, sealed: bool = False) -> bytes:
+    """Corrupt the first payload bit, preserving magic/header and the old CRC.
+
+    sealed=True: flip the same bit without the key. The attacker skips the
+    12-byte nonce and the 13 encrypted header bytes and flips the top bit of
+    the first ciphertext payload byte. CTR maps a ciphertext bit flip to the
+    same plaintext bit, so the header still opens and the (encrypted) CRC
+    reports the change -> Tampered. Assumes redundancy 1, like the plaintext
+    variant: with more copies the majority vote repairs a single flip.
+    """
     cover = _load(data, kind)
-    frame = bytearray(_frame(cover.elements, n_lsb, start))
+    if sealed:
+        target_bit = (sealing.NONCE_SIZE + container.HEADER_SIZE) * 8
+        # Whole elements only: embed_bits zero-pads a partial final element,
+        # which would silently clear sealed bits after the one we flip.
+        n_bits = -(-(target_bit + 1) // n_lsb) * n_lsb
+        bits = _sealed_region_bits(cover.elements, n_lsb, start, n_bits).copy()
+        bits[target_bit] ^= 1
+        return _save(cover, lsb.embed_bits(cover.elements, bits, start, n_lsb), kind)
+    frame = bytearray(_plaintext_frame(cover.elements, n_lsb, start, "corrupt_payload"))
     if container.parse_header(frame)[0] == 0:
         raise FrameError("frame has no payload to corrupt")
     frame[container.HEADER_SIZE] ^= 0x80
@@ -159,11 +218,27 @@ def corrupt_payload(data: bytes, kind: str, n_lsb: int, start: int) -> bytes:
     return _save(cover, elements, kind)
 
 
-def replay(stego: bytes, other_cover: bytes, kind: str, n_lsb: int, start: int) -> bytes:
-    """Transplant the unchanged signed frame; the target must differ in hashed media or shape."""
+def replay(
+    stego: bytes, other_cover: bytes, kind: str, n_lsb: int, start: int, *, sealed: bool = False
+) -> bytes:
+    """Transplant the unchanged signed frame; the target must differ in hashed media or shape.
+
+    sealed=True: a key-less attacker cannot read the sealed frame's length,
+    so it copies every hidden bit from `start` to the end of the shorter
+    cover. That still carries the whole sealed frame across when it fits, and
+    the verifier opens it with the right passphrase, finds a valid signature
+    and a media hash that does not match -> Tampered (verify with the
+    original explicit offset: a different cover size moves a derived start).
+    """
     source = _load(stego, kind)
     target = _load(other_cover, kind)
-    frame = _frame(source.elements, n_lsb, start)
+    if sealed:
+        count = min(len(source.elements), len(target.elements)) - start
+        if count <= 0:
+            raise FrameError(f"start {start} leaves no hidden bits to transplant between these covers")
+        bits = _sealed_region_bits(source.elements, n_lsb, start, count * n_lsb)
+    else:
+        bits = lsb.bytes_to_bits(_plaintext_frame(source.elements, n_lsb, start, "replay"))
     mask = np.array(np.iinfo(source.elements.dtype).max ^ ((1 << n_lsb) - 1), dtype=source.elements.dtype)
     same_format = all(
         getattr(source, key, None) == getattr(target, key, None)
@@ -171,5 +246,5 @@ def replay(stego: bytes, other_cover: bytes, kind: str, n_lsb: int, start: int) 
     )
     if same_format and np.array_equal(source.elements & mask, target.elements & mask):
         raise ValueError("replay target must differ in signed media content or dimensions")
-    elements = lsb.embed_bits(target.elements, lsb.bytes_to_bits(frame), start, n_lsb)
+    elements = lsb.embed_bits(target.elements, bits, start, n_lsb)
     return _save(target, elements, kind)

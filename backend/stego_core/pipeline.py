@@ -6,6 +6,13 @@ after the pieces have tests.
 
     protect():  steps 1-6 of the required security workflow
     verify():   steps 7-10
+
+Optional sealed frames (`ProtectOptions.seal_frame`, see `sealing.py`) wrap
+the finished frame in AES-256-CTR before embedding. Verify needs no extra
+input for them: it tries the plaintext MAGIC first and, only if that is
+absent and a passphrase was given, tries to open a sealed header at the same
+start. Everything after the frame is recovered (CRC, signature, hash,
+parameter checks, the verdict table) is shared by both kinds of frame.
 """
 
 from __future__ import annotations
@@ -26,6 +33,7 @@ from . import (
     kdf,
     location,
     lsb,
+    sealing,
     signing,
     video_codec,
 )
@@ -48,17 +56,19 @@ class ProtectOptions:
     explicit_start: int | None = None  # set this to use EXPLICIT mode
     encrypt_message: bool = False
     redundancy: int = 1  # bonus robust embedding (spec Section 8): see ecc.py
+    seal_frame: bool = False  # encrypt the whole frame (optional challenge): see sealing.py
 
 
 @dataclass
 class ProtectOutcome:
     stego_bytes: bytes
     start_offset: int
-    frame_bytes: int
+    frame_bytes: int  # bytes embedded per copy; includes the 12-byte seal nonce when sealed
     capacity_bytes: int
     payload_json: dict
     signature: bytes
     redundancy: int = 1
+    sealed: bool = False
 
 
 def _load_cover(cover_kind: str, cover_bytes: bytes):
@@ -124,6 +134,7 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
                                     media_hash, nonce, n_lsb, cover_kind, shape
       6. Serialize + sign           payload.serialize -> signing.sign(private_pem, ...)
       7. Build the frame            container.build_frame(...)
+         [optional] Seal it         sealing.seal(k_seal, frame) -> nonce || AES-CTR(frame)
       8. CAPACITY CHECK             frame_size_bits vs lsb.capacity_bits — raise
                                     CapacityError with a helpful message; this is
                                     a REQUIRED demo case (spec Section 5)
@@ -145,6 +156,11 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
     if opts.passphrase:
         salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
         derived = kdf.derive_keys(opts.passphrase, salt)
+    if opts.seal_frame and derived is None:
+        raise StegoError(
+            "a passphrase is required to seal the frame: the sealing key is derived from it, "
+            "and the verifier needs the same passphrase to find the payload at all"
+        )
 
     message_bytes = opts.message
     encrypted = False
@@ -174,6 +190,18 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
     frame = container.build_frame(payload_bytes, signature, opts.n_lsb, encrypted)
     ecc.validate_redundancy(opts.redundancy)
 
+    # What actually goes into the cover. Sealing prepends a 12-byte nonce and
+    # encrypts the rest, so the "header block" that the verifier must read
+    # before it knows any lengths grows to nonce + HEADER_SIZE bytes. Both the
+    # capacity maths and the redundancy split below work on these two values,
+    # so an unsealed frame goes through exactly the same arithmetic as before.
+    if opts.seal_frame:
+        embedded = sealing.seal(derived.k_seal, frame)
+        header_block_len = sealing.NONCE_SIZE + container.HEADER_SIZE
+    else:
+        embedded = frame
+        header_block_len = container.HEADER_SIZE
+
     # Required demo case (spec Section 5): a blanket "does this even fit
     # anywhere" check, with a message that names the shortfall directly,
     # rather than letting a cryptic CapacityError surface from deep inside
@@ -182,23 +210,28 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
     # frame that fits at redundancy=1 may legitimately stop fitting once
     # asked to repeat itself several times over.
     if opts.redundancy == 1:
-        total_frame_elements = -(-(len(frame) * 8) // opts.n_lsb)
+        total_frame_elements = -(-(len(embedded) * 8) // opts.n_lsb)
     else:
         # Two separately rounded blocks (header, then body; see the
         # embedding step below) can together need up to one more element
         # than a single combined block of the same total bit length would,
         # so account for the two ceilings here rather than one.
-        header_elements = -(-(container.HEADER_SIZE * 8 * opts.redundancy) // opts.n_lsb)
-        body_elements = -(-((len(frame) - container.HEADER_SIZE) * 8 * opts.redundancy) // opts.n_lsb)
+        header_elements = -(-(header_block_len * 8 * opts.redundancy) // opts.n_lsb)
+        body_elements = -(-((len(embedded) - header_block_len) * 8 * opts.redundancy) // opts.n_lsb)
         total_frame_elements = header_elements + body_elements
     total_frame_bits = total_frame_elements * opts.n_lsb
     total_capacity_bits = lsb.capacity_bits(n_elements, opts.n_lsb)
     if total_frame_bits > total_capacity_bits:
         redundancy_note = f" at redundancy={opts.redundancy}" if opts.redundancy > 1 else ""
+        seal_note = (
+            f"; that includes the {sealing.NONCE_SIZE}-byte seal nonce a sealed frame adds to every copy"
+            if opts.seal_frame
+            else ""
+        )
         raise CapacityError(
-            f"payload does not fit: the frame needs {len(frame)} bytes "
+            f"payload does not fit: the frame needs {len(embedded)} bytes "
             f"({total_frame_bits} bits{redundancy_note}) at n_lsb={opts.n_lsb}, but this cover only "
-            f"has capacity for {total_capacity_bits // 8} bytes"
+            f"has capacity for {total_capacity_bits // 8} bytes{seal_note}"
         )
 
     if opts.explicit_start is not None:
@@ -227,7 +260,7 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
         raise StegoError(str(exc)) from exc
 
     if opts.redundancy == 1:
-        bits = lsb.bytes_to_bits(frame)
+        bits = lsb.bytes_to_bits(embedded)
         new_elements = lsb.embed_bits(elements, bits, start, opts.n_lsb)
     else:
         # Two separate repeated blocks (header, then body), not one repeated
@@ -236,23 +269,24 @@ def protect(opts: ProtectOptions) -> ProtectOutcome:
         # lengths needed to size the body read, so each copy of the header
         # has to sit at a fixed, frame-length-independent offset. See
         # extraction.py's extract_frame docstring for the matching read side.
-        header_bits = ecc.repeat_bits(lsb.bytes_to_bits(frame[: container.HEADER_SIZE]), opts.redundancy)
-        body_bits = ecc.repeat_bits(lsb.bytes_to_bits(frame[container.HEADER_SIZE :]), opts.redundancy)
+        # A sealed frame splits the same way, with the nonce inside the header
+        # block (extraction.extract_sealed_frame reads it back).
+        header_bits = ecc.repeat_bits(lsb.bytes_to_bits(embedded[:header_block_len]), opts.redundancy)
+        body_bits = ecc.repeat_bits(lsb.bytes_to_bits(embedded[header_block_len:]), opts.redundancy)
         header_elements = -(-len(header_bits) // opts.n_lsb)
         elements_with_header = lsb.embed_bits(elements, header_bits, start, opts.n_lsb)
-        new_elements = lsb.embed_bits(
-            elements_with_header, body_bits, start + header_elements, opts.n_lsb
-        )
+        new_elements = lsb.embed_bits(elements_with_header, body_bits, start + header_elements, opts.n_lsb)
     stego_bytes = _save_cover(opts.cover_kind, cover, new_elements)
 
     return ProtectOutcome(
         stego_bytes=stego_bytes,
         start_offset=start,
-        frame_bytes=len(frame),
+        frame_bytes=len(embedded),
         capacity_bytes=total_capacity_bits // 8,
         payload_json=json.loads(payload_bytes),
         signature=signature,
         redundancy=opts.redundancy,
+        sealed=opts.seal_frame,
     )
 
 
@@ -279,9 +313,29 @@ class VerifyOutcome:
     signature_valid: bool | None = None
     message_decrypted: bool = False
     decryption_error: str | None = None
+    # True: a sealed frame was opened at the start. False: a plaintext frame
+    # (MAGIC) was found, at the start or, for Wrong Start Location, elsewhere.
+    # None: no frame was located at all.
+    sealed: bool | None = None
 
 
-def _give_up(outcome: ExtractionOutcome, start: int | None, detail: str | None = None) -> VerifyOutcome:
+# Appended to not-found verdicts. A sealed frame is invisible without the right
+# key, so "no payload" is the honest answer, but the user deserves the caveat.
+SEALED_NOT_FOUND_HINT = (
+    "If this file was protected with a sealed frame, a wrong passphrase or media ID is "
+    "indistinguishable from no payload."
+)
+SEALED_NEEDS_PASSPHRASE_HINT = (
+    "If this file was protected with a sealed frame, the sender's passphrase is needed to find it."
+)
+
+
+def _give_up(
+    outcome: ExtractionOutcome,
+    start: int | None,
+    detail: str | None = None,
+    sealed: bool | None = None,
+) -> VerifyOutcome:
     verdict, reasons = decide(outcome)
     if detail is not None:
         reasons.append(detail)
@@ -293,6 +347,7 @@ def _give_up(outcome: ExtractionOutcome, start: int | None, detail: str | None =
         media_hash_recomputed=None,
         start_offset_used=start,
         signature_valid=outcome.signature_valid,
+        sealed=sealed,
     )
 
 
@@ -303,10 +358,14 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
       1. Decode the stego object. UnsupportedCoverError -> CANNOT_VERIFY.
       2. Resolve the start: explicit offset, or location.derive_start(...).
       3. Read the magic at that start.
-         No MAGIC? -> location.scan_for_magic(...) decides between
-         WRONG_START_LOCATION and PAYLOAD_MISSING.
-      4. extraction.extract_frame validates the header and lengths, then
-         extracts the exact payload and signature bytes with a CRC check.
+         No MAGIC, but a passphrase? -> extraction.sealed_frame_at(...) tries
+         to open a sealed header there with K_seal (sealing.py).
+         Neither? -> location.scan_for_magic(...) decides between
+         WRONG_START_LOCATION and PAYLOAD_MISSING, exactly as for an
+         unsealed file (a sealed frame never contains a plaintext MAGIC).
+      4. extraction.extract_frame (or extract_sealed_frame) validates the
+         header and lengths, then extracts the exact payload and signature
+         bytes with a CRC check.
       5. signing.verify(public_pem, payload_bytes, signature).
       6. payload.deserialize, then recompute hashing.stable_media_hash with the
          n_lsb and header fields FROM THE SIGNED PAYLOAD, and compare.
@@ -318,6 +377,16 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
     error in `reasons` — a crash during the live demo is worse than a verdict.
     """
     outcome = ExtractionOutcome()
+    derived: kdf.DerivedKeys | None = None
+
+    def keys() -> kdf.DerivedKeys:
+        # scrypt costs ~100 ms by design; run it at most once per verify.
+        nonlocal derived
+        if derived is None:
+            salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
+            derived = kdf.derive_keys(opts.passphrase, salt)
+        return derived
+
     try:
         try:
             cover, header_fields, actual_shape = _load_cover(opts.cover_kind, opts.stego_bytes)
@@ -334,11 +403,9 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
         if opts.explicit_start is not None:
             start = opts.explicit_start
         elif opts.passphrase:
-            salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
-            derived = kdf.derive_keys(opts.passphrase, salt)
             try:
                 start = location.derive_start(
-                    derived.k_loc,
+                    keys().k_loc,
                     opts.media_id,
                     opts.cover_kind,
                     opts.n_lsb,
@@ -380,6 +447,17 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             )
             magic_bits = header_bits[: len(container.MAGIC) * 8]
         outcome.magic_at_expected_start = lsb.bits_to_bytes(magic_bits) == container.MAGIC
+        sealed = False
+
+        # --- 3b. No plaintext MAGIC: is there a sealed frame here instead? ----------
+        # Only the passphrase can reveal one, so this costs nothing without it.
+        # An opened sealed header plays the role of "MAGIC at the expected
+        # start" in the verdict table; decide() itself is unchanged.
+        if not outcome.magic_at_expected_start and opts.passphrase:
+            sealed = extraction.sealed_frame_at(
+                elements, start, opts.n_lsb, keys().k_seal, redundancy=opts.redundancy
+            )
+            outcome.magic_at_expected_start = sealed
 
         if not outcome.magic_at_expected_start:
             found = location.scan_for_magic(elements, opts.n_lsb, location.MAX_SCAN_POSITIONS)
@@ -393,11 +471,19 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
                     "searched, so payload absence cannot be confirmed. Check the original "
                     "passphrase, media ID, LSB count, or explicit start offset."
                 )
-            return _give_up(outcome, start)
+            if found is not None:
+                return _give_up(outcome, start, sealed=False)
+            hint = SEALED_NOT_FOUND_HINT if opts.passphrase else SEALED_NEEDS_PASSPHRASE_HINT
+            return _give_up(outcome, start, detail=hint)
 
         # --- 4. Read the rest of the frame ------------------------------------------
         try:
-            frame = extraction.extract_frame(elements, start, opts.n_lsb, redundancy=opts.redundancy)
+            if sealed:
+                frame = extraction.extract_sealed_frame(
+                    elements, start, opts.n_lsb, keys().k_seal, redundancy=opts.redundancy
+                )
+            else:
+                frame = extraction.extract_frame(elements, start, opts.n_lsb, redundancy=opts.redundancy)
             payload_bytes, signature = frame.payload_bytes, frame.signature
             frame_n_lsb = frame.n_lsb
             outcome.frame_parsed = True
@@ -406,7 +492,7 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             outcome.frame_parsed = False
             # Expected damaged-input status belongs to the existing frame-failed
             # rule. outcome.error is reserved for Cannot Verify conditions.
-            return _give_up(outcome, start, detail=str(exc))
+            return _give_up(outcome, start, detail=str(exc), sealed=sealed)
 
         # --- Deserialize the payload -------------------------------------------------
         try:
@@ -414,7 +500,7 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             outcome.payload_parsed = True
         except FrameError as exc:
             outcome.payload_parsed = False
-            return _give_up(outcome, start, detail=str(exc))
+            return _give_up(outcome, start, detail=str(exc), sealed=sealed)
 
         # --- 5. Signature ------------------------------------------------------------
         try:
@@ -422,10 +508,10 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
         except KeyError_ as exc:
             outcome.public_key_usable = False
             outcome.error = str(exc)
-            return _give_up(outcome, start)
+            return _give_up(outcome, start, sealed=sealed)
 
         if not outcome.signature_valid:
-            return _give_up(outcome, start)
+            return _give_up(outcome, start, sealed=sealed)
 
         # --- 6. Recompute the media hash, using the SIGNED n_lsb but the ACTUAL
         # cover's own header fields (that's what "stable" means: reproducible
@@ -448,10 +534,8 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
         decryption_error = "Enter the sender's passphrase to decrypt the message." if pl.encrypted else None
         if pl.encrypted and opts.passphrase:
             try:
-                salt = hashlib.sha256(opts.media_id.encode("utf-8")).digest()
-                derived = kdf.derive_keys(opts.passphrase, salt)
                 plaintext = payload_mod.decrypt_message(
-                    derived.k_enc, pl.message, aad=opts.media_id.encode("utf-8")
+                    keys().k_enc, pl.message, aad=opts.media_id.encode("utf-8")
                 )
                 payload_json["message_b64"] = base64.b64encode(plaintext).decode("ascii")
                 message_decrypted = True
@@ -470,6 +554,7 @@ def verify(opts: VerifyOptions) -> VerifyOutcome:
             media_hash_recomputed=media_hash_recomputed,
             start_offset_used=start,
             signature_valid=outcome.signature_valid,
+            sealed=sealed,
         )
     except StegoError as exc:
         outcome.error = str(exc)

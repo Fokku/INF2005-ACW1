@@ -11,10 +11,15 @@ The argument parsing below is COMPLETE. Each command's body calls into
     stego keygen   --out keys
     stego capacity --cover FILE --lsb N
     stego protect  --cover FILE --message FILE --lsb N --media-id ID \
-                   --key keys/private/team_ed25519.pem --passphrase SECRET --out FILE
+                   --key keys/private/team_ed25519.pem --passphrase SECRET --out FILE \
+                   [--seal]
     stego verify   --stego FILE --pub keys/public/team_ed25519.pub.pem \
                    --lsb N --media-id ID --passphrase SECRET
-    stego tamper   --stego FILE --attack flip_bits --out FILE
+    stego tamper   --stego FILE --attack flip_bits --out FILE [--sealed]
+
+`--seal` encrypts the whole embedded frame (stego_core/sealing.py). verify
+needs no flag for it: it opens a sealed frame automatically when the
+passphrase is right, and reports "sealed" in its JSON output.
     stego serve    [--port 8000] [--reload]
 """
 
@@ -112,6 +117,7 @@ def _cmd_protect(args: argparse.Namespace) -> int:
         passphrase=args.passphrase,
         explicit_start=args.start,
         encrypt_message=args.encrypt,
+        seal_frame=args.seal,
     )
     outcome = pipeline.protect(opts)
     Path(args.out).write_bytes(outcome.stego_bytes)
@@ -119,6 +125,7 @@ def _cmd_protect(args: argparse.Namespace) -> int:
     print(f"wrote: {args.out}")
     print(f"start offset: {outcome.start_offset}")
     print(f"frame bytes:  {outcome.frame_bytes} (capacity: {outcome.capacity_bytes} bytes)")
+    print(f"sealed:       {'yes' if outcome.sealed else 'no'}")
     print(json.dumps(outcome.payload_json, indent=2))
     return 0
 
@@ -141,6 +148,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         "reasons": outcome.reasons,
         "start_offset_used": outcome.start_offset_used,
         "signature_valid": outcome.signature_valid,
+        "sealed": outcome.sealed,
         "media_hash_embedded": outcome.media_hash_embedded,
         "media_hash_recomputed": outcome.media_hash_recomputed,
         "payload": outcome.payload_json,
@@ -163,14 +171,16 @@ def _cmd_tamper(args: argparse.Namespace) -> int:
     elif args.attack == "reencode":
         output = attacks.reencode(data, kind)
     elif args.attack == "corrupt_payload":
-        output = attacks.corrupt_payload(data, kind, args.lsb, args.start)
+        output = attacks.corrupt_payload(data, kind, args.lsb, args.start, sealed=args.sealed)
     else:
         if not args.other_cover:
             raise StegoError("--attack replay requires --other-cover")
         other_kind = _sniff_kind(Path(args.other_cover))
         if other_kind != kind:
             raise StegoError("replay target must have the same cover kind")
-        output = attacks.replay(data, Path(args.other_cover).read_bytes(), kind, args.lsb, args.start)
+        output = attacks.replay(
+            data, Path(args.other_cover).read_bytes(), kind, args.lsb, args.start, sealed=args.sealed
+        )
 
     Path(args.out).write_bytes(output)
     print(f"wrote: {args.out}")
@@ -217,6 +227,11 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--passphrase", help="required for a derived start location and/or encryption")
     pr.add_argument("--start", type=int, help="explicit start offset instead of deriving one")
     pr.add_argument("--encrypt", action="store_true", help="AES-256-GCM the message")
+    pr.add_argument(
+        "--seal",
+        action="store_true",
+        help="AES-256-CTR the whole frame so no plaintext magic/header is embedded (needs --passphrase)",
+    )
     pr.add_argument("--out", required=True)
     pr.set_defaults(func=_cmd_protect)
 
@@ -239,6 +254,11 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--lsb", type=int, default=1, choices=range(1, 9))
     t.add_argument("--start", type=int, default=0)
     t.add_argument("--other-cover", help="for --attack replay")
+    t.add_argument(
+        "--sealed",
+        action="store_true",
+        help="corrupt_payload/replay on a sealed frame, without the passphrase",
+    )
     t.add_argument("--out", required=True)
     t.set_defaults(func=_cmd_tamper)
 

@@ -28,6 +28,11 @@ async def run_attack(
     n_lsb: int = Form(1, ge=1, le=8),
     start_offset: int = Form(0, ge=0),
     other_cover: UploadFile | None = File(None),
+    sealed: bool = Form(
+        False,
+        description="the target holds a sealed frame: corrupt_payload and replay then run their key-less "
+        "variants (see stego_core.attacks)",
+    ),
 ) -> AttackResult:
     kind = _sniff_kind(stego.filename or "")
     data = await stego.read()
@@ -45,7 +50,7 @@ async def run_attack(
         elif attack == AttackKind.reencode:
             output = attacks.reencode(data, kind.value)
         elif attack == AttackKind.corrupt_payload:
-            output = attacks.corrupt_payload(data, kind.value, n_lsb, start_offset)
+            output = attacks.corrupt_payload(data, kind.value, n_lsb, start_offset, sealed=sealed)
         elif attack == AttackKind.lsb_noise:
             output = attacks.lsb_noise(data, kind.value, n_lsb)
         else:
@@ -53,7 +58,9 @@ async def run_attack(
                 raise ValueError("a second cover is required for replay")
             if _sniff_kind(other_cover.filename or "") != kind:
                 raise ValueError("replay target must have the same cover kind")
-            output = attacks.replay(data, await other_cover.read(), kind.value, n_lsb, start_offset)
+            output = attacks.replay(
+                data, await other_cover.read(), kind.value, n_lsb, start_offset, sealed=sealed
+            )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     suffix = {"image": ".png", "audio": ".wav", "video": ".avi"}[kind.value]
