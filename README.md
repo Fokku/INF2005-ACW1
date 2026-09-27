@@ -3,23 +3,24 @@
 INF2005 ACW1 team project (Singapore Institute of Technology, Trimester 1 2026).
 A GUI-based **LSB-replacement steganography** tool that protects a PNG image and a WAV audio file by embedding a **signed verification payload** inside them, and later verifies whether a file is authentic using **hashing** and **digital-signature** checks.
 
-> **Status: core pipeline working.** The web UI, the API, and the full protect → verify round trip
-> (LSB embed/extract, hashing, Ed25519 signing, start-location derivation, all six verdicts) work
-> end to end for image, audio, and video covers — 629/629 backend tests green. The Attack Lab
-> implements six PNG/WAV attacks, plus five AVI audio-track attacks (AVI crop is unsupported).
-> See [the Attack Lab design and demo guide](docs/design/attack-lab.md) for verdict conditions.
-> The curated `samples/` set and `scripts/make_samples.py` are done — see "Expected outputs" below.
-> The `stego` CLI (a rescue path if the web UI misbehaves) is implemented — `keygen`, `capacity`,
-> `protect`, `verify`, `tamper` all work end to end against real PNG/WAV covers
-> (`backend/tests/test_cli.py`, 7/7 green). What's left is the party A → B email evidence, and the
-> submission admin (demo plan, declaration, contribution statement).
-> See [TODO.md](TODO.md) for the nine workstreams and [TECH_STACK.md](TECH_STACK.md) for the stack.
+> **Status: demo-ready.** The web UI, the API and the full protect → verify round trip (LSB
+> embed/extract, hashing, Ed25519 signing, start-location derivation, all six verdicts) work end to
+> end for image, audio and video covers — **806 backend tests green** (`./scripts/check.sh`). Every
+> scenario the demo needs is also exercised in the real GUI by a Playwright run that asserts each
+> verdict: **38/38 scenes pass**, screenshots in [`evidence/screenshots/gui/`](evidence/screenshots/gui/README.md).
+> Optional challenges done: video cover, attack simulation, robust embedding, steganalysis, and the
+> sealed frame (advanced start-location security). Party A → party B transfer evidence:
+> [`evidence/transfer.md`](evidence/transfer.md).
 >
-> Find your work with: `grep -rn "TODO(team)" backend frontend scripts`
+> **Left for the team before submission** (none of it can be done by one person alone): the live
+> two-machine email transfer and its screenshots, the six signatures on the declaration, the agreed
+> percentages on the contribution statement, confirming the demo-plan slots, and two timed
+> rehearsals on the lab PC. See [TODO.md](TODO.md) workstream I.
 
 ## Team
 
-Team number: `Px-x` (fill in).
+Team number: `P6-8` — the ID `scripts/make_samples.py` signs into every sample (`TEAM_ID`); confirm it
+matches xSite before submission.
 
 | Member |
 | --- |
@@ -45,27 +46,28 @@ against the per-workstream owners already recorded in [TODO.md](TODO.md)):
 | FR8 – Extraction and decoding | Ridwan / Zong Han |
 | FR9 – Hash verification | Ridwan / Zong Han |
 | FR10 – Verdict generation | Zong Han |
-| FR11 – Positive and negative cases | Kannan / Zong Han |
-| FR12 – Evidence and reproducibility | All |
-| FR13 – Innovation | Zong Han (start location), Kannan (attack lab) |
+| FR11 – Positive and negative cases | Kannan / Zong Han / Kai Yuan ( |
+| FR12 – Evidence and reproducibility | All — Wen Xuan (samples), Kannan (FR11 evidence), Kai Yuan (GUI screenshots, transfer evidence) |
+| FR13 – Innovation | Zong Han (start location), Kannan (attack lab), Wen Xuan (robust embedding), Kai Yuan (sealed frame) |
+| Project architecture and scaffold (web UI, API, module structure, team plan) | Kai Yuan |
+| Optional challenges (spec Section 8) | Ke Ying (video cover, steganalysis), Kannan (attack simulation), Wen Xuan (robust embedding), Kai Yuan (advanced start-location security: sealed frame) |
 
-> **Note:** "Ridwan" / "Kannan" above are the names used in the task-allocation document and in
-> `docs/design/*`; the member table lists "Wan" and "Kannon" respectively. Please confirm these
-> refer to the same two people before this goes into the submission.
+The full per-member breakdown, with the files each person wrote, is in
+[docs/contribution-distribution-statement.md](docs/contribution-distribution-statement.md).
 
 ## What the tool does
 
 **Protect (party A)**
 
-1. Choose a cover object: PNG image or WAV/PCM audio.
+1. Choose a cover object: PNG image, WAV/PCM audio, or an AVI video with a PCM audio track (the payload rides in the audio track).
 2. The system hashes a stable representation of the cover (SHA-256) and builds a compact payload: media ID, timestamp, hash, nonce and team-defined metadata, plus the hidden message (short, large, or a custom confidentiality-protected message).
 3. The payload is digitally signed with the team's private key (Ed25519).
-4. The user picks the number of LSBs to use (1–8) and a start location (explicit, or derived from a passphrase so the verifier can re-derive it). The payload and signature are embedded by LSB replacement starting at that location.
-5. The stego file is downloaded and sent to party B (e.g. as an email attachment).
+4. The user picks the number of LSBs to use (1–8), how many copies to embed (robust embedding), and a start location (explicit, or derived from a passphrase so the verifier can re-derive it). Optionally the whole frame is **sealed** (encrypted, magic marker included) so it cannot even be found without the passphrase. The payload and signature are embedded by LSB replacement starting at that location.
+5. The stego file is downloaded and sent to party B (e.g. as an email attachment). A hand-off card lists what party B needs: media ID, LSB count, copies, start mode, the file's SHA-256 and the signer's key fingerprint.
 
 **Verify (party B)**
 
-1. Upload the received stego file, supply the public key and the passphrase / start location.
+1. Upload the received stego file (its SHA-256 is checked against the one party A read out), supply the public key and the passphrase / start location.
 2. The system recovers the start location, extracts the payload and signature, verifies the signature with the public key, and recomputes the media hash.
 3. It returns a verdict with an explanation:
 
@@ -78,7 +80,7 @@ against the per-workstream owners already recorded in [TODO.md](TODO.md)):
 | **Wrong Start Location** | A payload exists but not at the location derived from the supplied key/offset. |
 | **Cannot Verify** | Unsupported file, missing/invalid public key, or an internal error. |
 
-The GUI shows the cover and stego objects side by side (image) and plays cover, stego and payload audio, before and after encoding and decoding.
+The GUI shows the cover and stego objects side by side (image, with an amplified LSB plane) and plays cover, stego and payload audio (for AVI, the audio track that carries the payload), before and after encoding and decoding. Two more tabs complete it: the **Attack Lab** manufactures the negative cases and hands each damaged file straight to Verify, and **Steganalysis** shows what an analyst with no key can infer (chi-square and byte-phase tests, per-window evidence chart).
 
 ## Repository layout
 
@@ -86,27 +88,30 @@ The GUI shows the cover and stego objects side by side (image) and plays cover, 
 ACW1/
 ├── README.md            this file
 ├── TECH_STACK.md        technologies, versions, commands, rules
-├── TODO.md              task inventory (unassigned)
+├── TODO.md              task inventory with owners
 ├── docs/
 │   ├── spec/            assignment specification (md + pdf)
 │   ├── design/          design notes: payload format, start location, verdict table, threat model, innovation, limitations & AI use
-│   ├── demo-plan.md     25-minute demo sequence (drafted; needs member names)
-│   ├── declaration-of-originality.md          template, needs signatures
-│   └── contribution-distribution-statement.md template, needs agreed percentages
+│   ├── demo-plan.md     25-minute demo sequence (slots proposed by FR ownership; confirm at rehearsal)
+│   ├── declaration-of-originality.md          needs all six signatures
+│   └── contribution-distribution-statement.md responsibilities filled in; needs agreed percentages
 ├── keys/
 │   ├── public/          team public key(s) — tracked
 │   └── private/         demo-only private key — gitignored, never committed
 ├── samples/
 │   ├── image/           original/ stego/ tampered/
 │   ├── audio/           original/ stego/ tampered/
+│   ├── video/           original/cover.avi (built by scripts/make_video_cover.py)
 │   └── payloads/        short (a Learning Outcome), large (Project Overview paragraph), custom (encrypted)
-├── evidence/            screenshots/ and logs/ of verification results and test runs
+├── evidence/            screenshots/ (gui/ = Playwright run, section-f/), logs/, fr10-fr11/, transfer/, steganalysis/
 ├── backend/
 │   ├── stego_core/      the marked logic: LSB, hashing, signing, start location, verdicts
 │   ├── app/             FastAPI routers and the API contract (schemas.py)
 │   └── tests/           pytest suite; test_verdicts.py is the gate
-├── frontend/            React + TypeScript + Tailwind CSS web UI (four tabs)
-└── scripts/             setup / dev / demo / check / make_samples
+├── frontend/            React + TypeScript + Tailwind CSS web UI (five tabs, fonts bundled — works offline)
+└── scripts/             setup / dev / demo / check / package_submission, plus the evidence generators:
+                         make_samples, make_video_cover, transfer_demo, capture_screenshots,
+                         generate_verification_evidence, steganalysis
 ```
 
 ## Getting started
@@ -122,12 +127,25 @@ Then pick one:
 
 ```bash
 ./scripts/dev.sh            # development: API on :8000 + Vite on :5173 with hot reload
-./scripts/demo.sh           # demo/marker mode: one process on http://127.0.0.1:8000
+./scripts/demo.sh           # demo/marker mode: one process on http://127.0.0.1:8000   (Windows: scripts\demo.ps1)
 ./scripts/check.sh          # pytest + ruff + typecheck + lint
 ```
 
 Interactive API docs are at http://127.0.0.1:8000/docs — useful for testing the backend before
 the UI needs it.
+
+### Regenerating the evidence
+
+All from the repo root with the venv active:
+
+```bash
+PYTHONPATH=backend python scripts/make_samples.py                  # samples/ + evidence/logs/sample-manifest.json
+PYTHONPATH=backend python scripts/make_video_cover.py              # samples/video/original/cover.avi
+PYTHONPATH=backend python scripts/transfer_demo.py --out evidence/transfer   # party A -> B email round trip
+PYTHONPATH=backend python scripts/generate_verification_evidence.py          # evidence/fr10-fr11/
+# GUI screenshots (needs the UI built and, once: pip install -e "backend[evidence]" && python -m playwright install chromium)
+PYTHONPATH=backend python scripts/capture_screenshots.py           # evidence/screenshots/gui/, asserts every verdict
+```
 
 ### Expected outputs
 
@@ -148,8 +166,11 @@ every time by design).
 
 All cases below use `n_lsb=2` and the demo key pair at `keys/public/team_ed25519.pub.pem`
 (private half gitignored under `keys/private/`, regenerated locally by the script above).
-To reproduce a case through the **GUI** instead of pytest/`pipeline` calls directly: open the
-Verify tab, upload the file, paste the public key PEM, and fill in the settings column.
+To reproduce a case through the **GUI**: open the Verify tab, choose it under **Load a demo sample**
+(file, media ID, LSB count, start mode, passphrase and public key are filled in), and press
+**Extract and verify**. The media IDs are `P6-8-image-short`, `P6-8-audio-large` and so on — the
+loader reads them from `evidence/logs/sample-manifest.json`, and
+`backend/tests/test_samples_api.py` checks that every listed case produces its verdict.
 
 | Case | File | Cover / message | Settings | Expected verdict |
 | --- | --- | --- | --- | --- |
@@ -177,14 +198,26 @@ automated proof of this case, and `docs/design/attack-lab.md` / `evidence/sectio
 attack-driven negative cases (`crop`, `lsb_scrub`, `reencode`, `corrupt_payload`, `replay`) with
 screenshots.
 
-**Still outstanding** (spec FR11/FR12 — see [TODO.md](TODO.md) workstreams H and I): the actual
-party A → party B email transfer with before/after SHA-256 screenshots has not been performed yet;
-everything above is reproducible locally but has not been demonstrated over a real transfer.
+Beyond the curated files, the GUI run in [`evidence/screenshots/gui/`](evidence/screenshots/gui/README.md)
+records (and asserts) the live flows: protect → download → verify in a second browser session with
+the SHA-256 compared, the capacity block for image and audio, the AVI video cover, Attack Lab →
+Verify, robust embedding (1 copy + `lsb_noise` → Tampered; 3 copies → Authentic), and the sealed
+frame (right passphrase → Authentic; wrong passphrase → Cannot Verify on the 512×512 cover, because
+a sealed frame cannot be found without the passphrase; steganalysis finds no byte pattern in it).
+
+**Party A → party B transfer:** [`evidence/transfer.md`](evidence/transfer.md) records a real
+RFC 5322 email with both stego files as base64 MIME attachments, delivered over SMTP to a Maildir on
+this machine, then extracted and verified (SHA-256 identical before and after, both Authentic, the
+message decrypts; a wrong passphrase and a one-bit tamper are caught). The same flow over a real mail
+provider between two machines is done live in the demo (row 6 of the demo plan); its screenshots are
+added after rehearsal — checklist in `evidence/transfer.md`.
 
 ## Keys
 
 - The team's **public key** lives in `keys/public/` and is what a verifier (and the marker) uses.
 - The **private key** used for the demo is generated only for this assignment, kept in `keys/private/`, and is gitignored. `scripts/make_samples.py` generates the pair automatically the first time it runs (via `stego_core.signing.generate_keypair`) if `keys/private/team_ed25519.pem` doesn't already exist. Anyone cloning the repository can delete `keys/private/` and re-run the script for a fresh pair; the samples under `samples/` then regenerate and verify against the new public key. `stego keygen --out keys --label team` (see `backend/stego_core/cli.py`) does the same from the command line.
+- **Only the holder of `keys/private/team_ed25519.pem` should re-run `make_samples.py`.** On a machine without it, the script creates a *new* pair and re-signs every sample, so `samples/` and the committed public key change together (consistent, but a large diff). For live demos, generate a key pair on the Keys tab and use it for Protect; the curated samples keep verifying against `team_ed25519.pub.pem`, which the Verify tab's sample loader selects automatically.
+- `keys/public/section-f-demo.pub.pem` (Attack Lab evidence) and `keys/public/transfer-demo.pub.pem` (email transfer evidence) are separate demo keys; the sample loader uses the Section F key as the deliberately *wrong* key for the Signature Invalid case.
 
 ## Deadlines
 
@@ -202,9 +235,11 @@ Exact dates: to be confirmed by the team once the lab schedule is published.
 - [TODO.md](TODO.md) — every section and feature that has to be done, with spec references
 - [docs/spec/INF2005-ACW1-spec-v5.md](docs/spec/INF2005-ACW1-spec-v5.md) — the assignment specification
 - `docs/design/` — payload format, start location, extraction, hash verification, verdict table, threat model, attack lab, limitations and AI use
-- [docs/demo-plan.md](docs/demo-plan.md) — running order (needs names in the blanks)
-- [docs/declaration-of-originality.md](docs/declaration-of-originality.md) — template, needs signatures
-- [docs/contribution-distribution-statement.md](docs/contribution-distribution-statement.md) — template, needs agreed percentages
+- [docs/demo-plan.md](docs/demo-plan.md) — running order, with slots proposed by FR ownership
+- [docs/declaration-of-originality.md](docs/declaration-of-originality.md) — needs all six signatures
+- [docs/contribution-distribution-statement.md](docs/contribution-distribution-statement.md) — responsibilities per member; needs agreed percentages
+- [evidence/screenshots/gui/README.md](evidence/screenshots/gui/README.md) — 38 GUI scenes with expected and observed verdicts
+- [evidence/transfer.md](evidence/transfer.md) — party A → party B email round trip
 
 ## Use of generative AI
 
@@ -213,6 +248,6 @@ The assignment requires AI use to be disclosed in the Declaration of Originality
 ## Working conventions
 
 - Branch per feature, pull request into `main`, at least one other member reviews.
-- Run the checks before pushing: `pytest`, `ruff`, `biome check`, `tsc --noEmit` (see TECH_STACK.md).
+- Run the checks before pushing: `./scripts/check.sh` (pytest, ruff check + format, tsc, oxlint).
 - Never commit private keys, `.venv/`, `node_modules/` or `out/` (already gitignored).
 - Keep `samples/` and `evidence/` curated: only files that are used in the demo or submission.

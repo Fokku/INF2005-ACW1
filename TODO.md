@@ -1,17 +1,12 @@
 # TODO
 
-Work is grouped into **9 workstreams**. Each one is a self-contained chunk with its own files,
-sized so a person or a pair can own it. Nothing is assigned yet — put names in the `Owner` blanks
-when the team divides the work.
+Work is grouped into **9 workstreams** (plus K, demo readiness). Each one is a self-contained chunk
+with its own files and an `Owner` line.
 
-**How to find your work:** every stub in the codebase is marked `TODO(team)`. Run this to list them:
-
-```bash
-grep -rn "TODO(team)" backend frontend scripts
-```
-
-Each stub has a docstring explaining what it must do, a sketch of the implementation, and the
-traps to avoid. Read the docstring before writing code.
+**Status (2026-09-27):** every implementation stub is done (`grep -rn "TODO(team)" backend frontend
+scripts` finds nothing), 806 backend tests pass, and a Playwright run asserts 38 GUI scenes. What is
+still open is team-only: the live email transfer screenshots, signatures, agreed percentages,
+AI-use confirmations and rehearsals — see the unticked boxes in G, H and I.
 
 **Build order matters.** A → B → C → D can proceed in parallel after A lands. G (docs) and
 I (admin) can start immediately and run alongside everything.
@@ -173,7 +168,8 @@ Technical documents are complete. Personal AI-use confirmations remain a team ac
 - [x] `limitations-and-ai-use.md` — honest limits (magic bytes are scannable, LSB is fragile and
       detectable by steganalysis) plus recorded AI assistance and checks (Kannon)
 - [ ] Each member confirms their AI-use disclosure and reconciles it with the final declaration;
-      see the confirmation checklist in `limitations-and-ai-use.md`
+      see the confirmation checklist in `limitations-and-ai-use.md` (Kai Yuan's entry is recorded;
+      every member still confirms their own)
 
 ## H · Samples, evidence and test cases — `samples/`, `evidence/`, `scripts/make_samples.py`
 
@@ -204,10 +200,17 @@ object. `scripts/make_samples.py` now produces all 7 (plus `Cannot Verify`, prov
       (nonce/timestamp inside the signed payload vary by design, so stego bytes are not literally
       byte-identical — see the script's docstring)
 - [x] README's "Expected outputs" table — every sample file, its settings, and its verdict
-- [ ] Screenshots of each verdict (`evidence/logs/sample-manifest.json` has the text form; GUI
-      screenshots for the submission are still needed)
-- [ ] The party A → party B run: email the stego file **as an attachment**, download it, verify it,
-      and show the SHA-256 matching on both sides
+- [x] Screenshots of each verdict — Kai Yuan: `scripts/capture_screenshots.py` drives the real GUI
+      (Playwright) through all six verdicts for image and audio plus the capacity, transfer, attack,
+      robust, sealed, steganalysis and video flows, asserting each one — 38/38 in
+      `evidence/screenshots/gui/` (index: its `README.md`)
+- [x] The party A → party B run, recorded — Kai Yuan: `scripts/transfer_demo.py` sends a real
+      RFC 5322 email with both stego files as MIME attachments over SMTP to a Maildir, party B
+      extracts and verifies them; SHA-256 identical, Authentic, message decrypts; wrong passphrase
+      and a one-bit tamper caught (`evidence/transfer.md`); the GUI run repeats it across two
+      browser sessions with the SHA-256 compared on screen
+- [ ] The same run live between two machines over a real mail provider, with screenshots — at
+      rehearsal (checklist in `evidence/transfer.md`)
 
 ### FR11 testing, demonstration and evidence — Kannon (transfer pending)
 
@@ -219,7 +222,9 @@ Builds on the team's implementation, including Zong Han's FR10 verdict logic.
 - [x] Reproduction script: `scripts/generate_verification_evidence.py`
 - [x] Fix explicit-mode passphrase entry, decryption status and readable downloads;
       32 regression cases and PNG/WAV browser checks passed (629 backend tests total)
-- [ ] Party A → Party B attachment transfer, received-file verification and screenshots
+- [x] Party A → Party B attachment transfer and received-file verification, recorded locally
+      (with Kai Yuan — `evidence/transfer.md`)
+- [ ] The live two-machine transfer screenshots (demo row 6, at rehearsal)
 - [ ] Confirm the proposed custom demo message with the team
 
 See `evidence/fr10-fr11/manifest.json` for case results and verification settings.
@@ -231,17 +236,22 @@ team number, declaration, contribution statement, rehearsal — is a whole-team 
 
 Can start now.
 
-- [ ] Fill in the team number (`Px-x`) and the exact Week 5 dates
-- [ ] Demo plan: ≤ 25 minutes, a slot for **every** member, who shows what and in what order
-      (running order and settings drafted in `docs/demo-plan.md`; the `______` name blanks are open)
-- [ ] Declaration of Originality, signed by all six
-      (template with a signature table drafted: `docs/declaration-of-originality.md`)
-- [ ] Contribution/distribution statement with percentages, agreed by all six
-      (template drafted with the FR-ownership starting point: `docs/contribution-distribution-statement.md`)
+- [x] Team number filled in as `P6-8` (the `TEAM_ID` in `scripts/make_samples.py`) — confirm on xSite
+- [ ] Fill in the exact Week 5 dates once the schedule is published
+- [x] Demo plan: ≤ 25 minutes (24 planned), a slot for every member, proposed from FR ownership in
+      `docs/demo-plan.md` — Kai Yuan
+- [ ] Confirm or swap the demo-plan slots at the first rehearsal
+- [ ] Declaration of Originality, signed by all six (`docs/declaration-of-originality.md` is ready)
+- [ ] Contribution/distribution statement: responsibilities are filled in per member
+      (`docs/contribution-distribution-statement.md`, Kai Yuan); the **percentages still need
+      agreeing** and every member acknowledges
 - [x] Complete the README's "Expected outputs" section — every sample, its command, its verdict
-- [ ] Commit `keys/public/*.pem`; confirm no private key is in git history
-- [ ] Ship `frontend/dist` in the submission so the marker needs only Python
+- [x] `keys/public/*.pem` committed; no private key anywhere in git history (checked for Ed25519
+      PKCS#8 key material across every revision; `scripts/package_submission.sh` re-checks)
+- [x] Ship `frontend/dist` in the submission: `./scripts/package_submission.sh` builds the UI and
+      zips it with the committed tree into `dist/P6-8-ACW1-submission.zip`
 - [ ] Rehearse twice on the actual lab PC, including the email round trip
+      (`scripts/capture_screenshots.py` is the automated dry run to do first)
 
 **Deadlines:** demo plan + declaration + contribution statement are due **one day before the demo**.
 Code, README, samples, evidence and keys are due **Week 5 Friday**.
@@ -250,8 +260,8 @@ Code, README, samples, evidence and keys are due **Week 5 Friday**.
 
 ## J · Optional challenges (bonus, spec Section 8)
 
-Owner: Ke Ying (video cover object, done; steganalysis, done); Wen Xuan (robust embedding, implemented and tested,
-not yet merged — see the `robust-embedding` branch)
+Owner: Ke Ying (video cover object, done; steganalysis, done); Wen Xuan (robust embedding, done);
+Kai Yuan (advanced start-location security, done)
 
 These are the five official optional challenges. None are required for the core rubric — attempt
 after A–H are green. Pick one or two and go deep rather than spreading thin across all five.
@@ -282,14 +292,47 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
       required functions to also simulate wrong-key verification, payload corruption, wrong
       start-location extraction, and replay/substitution attempts, each asserting the verdict
       `attacks.EXPECTED` predicts.
-- [ ] **Advanced start-location security** — overlaps workstream D. Derive the start location from
-      a keyed pseudo-random function, an encrypted header, or a seed phrase (beyond the baseline
-      keyed HMAC in `derive_start`), and write up its limitations in `docs/design/start-location.md`.
+- [x] **Advanced start-location security** (Kai Yuan) — the **sealed frame**: on top of the keyed
+      HMAC start, the whole embedded frame (magic, header, payload, signature, CRC) is encrypted with
+      AES-256-CTR under a third passphrase-derived key and a fresh 12-byte nonce, so nothing in the
+      LSB plane can be scanned for or read without the passphrase; Verify detects it automatically.
+      `stego_core/sealing.py`, `tests/test_sealed_frame*.py`, `tests/test_attack_sealed_api.py`;
+      GUI option "Seal the frame"; limitations evaluated in `docs/design/start-location.md` §7
+      (wrong passphrase now reads as Payload Missing / Cannot Verify; CTR is malleable so integrity
+      still rests on the CRC + signature; chi-square steganalysis still sees *that* data is there).
 - [x] **Steganalysis** (Ke Ying) — using a known algorithm or methodology (e.g. chi-square attack, RS
       analysis, LSB histogram analysis), analyse one of the project's own stego samples and
       convincingly infer whether the cover shows signs of a hidden payload. Write up the method
       and result, ideally as a script under `scripts/` plus a short section in
       `docs/design/limitations-and-ai-use.md`. Done: `scripts/steganalysis.py`, `evidence/logs/steganalysis-demo.txt`.
+
+## K · Demo readiness — GUI, evidence tooling, admin
+
+Owner: Kai Yuan (done)
+
+A click-through of the real app found issues that would have broken the live demo; all fixed and
+covered by the Playwright run:
+
+- [x] Default protect → download → verify reported **Wrong Start Location** for a correct file:
+      Protect defaulted the media ID to the cover's name, Verify to the downloaded file's name
+      (`*.stego.png`). Protect now shows the media ID, Verify guesses it from the file name, and the
+      hand-off card / **Verify this file →** carries the exact settings across
+- [x] The team's `casefile` theme was overridden by `data-theme="dark"` (amber accent rendered
+      indigo); "Big Shoulders Condensed" is not a Google Fonts family (headings fell back to the
+      system font). Theme fixed; all three fonts now bundled — no CDN, works offline on the lab PC
+- [x] Browsers cannot play AVI: the video cover's players stayed blank. The payload-carrying audio
+      track is now played instead (`POST /api/preview/audio-track`); demo AVI cover built by
+      `scripts/make_video_cover.py`
+- [x] `POST /api/keys/inspect` took a query parameter while the UI sent a form (422) — fixed; the
+      Keys tab now checks fingerprints and lists the committed public keys
+- [x] Capacity meter's "largest message" disagreed with `fits` by up to 2 bytes — fixed with a
+      boundary test
+- [x] Steganalysis (Ke Ying's method) exposed as `POST /api/steganalysis` and a fifth GUI tab with
+      a per-window evidence chart
+- [x] Demo speed: one-click **Load a demo sample** on Verify (settings from the sample manifest,
+      `GET /api/samples`, every case asserted by `tests/test_samples_api.py`), committed-key picker,
+      SHA-256 "same bytes" check, "What to check" hints, Attack Lab → **Verify the damaged file**
+- [x] `scripts/demo.ps1` for Windows lab PCs; `scripts/package_submission.sh` for the final archive
 
 ---
 

@@ -32,8 +32,17 @@ not to possess the legitimate private signing key or encryption passphrase.
 | Resend an unchanged authentic file | Still Authentic | No replay cache, expiry check or trusted timestamp |
 | Search for the message | Magic and contiguous embedding can be located | Keyed placement is not encryption |
 | Read an encrypted message | AES-256-GCM protects message bytes under the derived key | Metadata stays visible; weak passphrases permit offline guessing |
-| Destroy embedded bits or withhold the file | Receiver cannot establish authenticity | No recovery redundancy or availability guarantee |
+| Destroy embedded bits or withhold the file | Receiver cannot establish authenticity; optional robust embedding (3 or 5 copies, majority vote) repairs scattered bit damage | Redundancy does not survive re-encoding, resampling or cropping; no availability guarantee |
 | Supply malformed lengths/fields | Bounded extraction and strict decoding reject invalid frames | Does not establish comprehensive denial-of-service protection |
+
+The "Search for the message" and "Read an encrypted message" rows describe the default
+plaintext frame. With the optional sealed frame
+([start-location.md §7](start-location.md#7-advanced-start-location-security-sealed-frames-optional-challenge-owner-yeo-kai-yuan)),
+the whole frame is AES-256-CTR ciphertext under a key derived from the passphrase and media
+ID, so an attacker without them can neither find the magic nor read the metadata. The
+embedded region stays statistically detectable, CTR adds no integrity (the CRC still catches
+accidental damage and the Ed25519 signature deliberate edits), and a wrong passphrase or media ID gives Payload Missing or
+Cannot Verify instead of Wrong Start Location.
 
 The nonce makes payload instances distinct but is not replay prevention on its
 own. A timestamp is a signed claim by the sender, not proof of freshness. The

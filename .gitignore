@@ -42,3 +42,6 @@ out/
 # Ignored during development. At feature freeze, force-add it on the submission
 # tag (`git add -f frontend/dist`) so the marker needs only Python, no Node.
 frontend/dist/
+
+# ---- Submission archive (scripts/package_submission.sh) ----
+/dist/
