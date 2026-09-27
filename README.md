@@ -23,12 +23,12 @@ Team number: `Px-x` (fill in).
 
 | Member |
 | --- |
-| Yeo Kai Yuan |
-| Wen Xuan Loh |
 | Ang Ke Ying |
-| Wan |
-| Zong Han |
-| Kannon |
+| Chng Zong Han |
+| Kannan s/o Rajamohan |
+| Loh Wen Xuan |
+| Muhammad Ridwan Putra Jasni |
+| Yeo Kai Yuan |
 
 Task ownership by functional requirement, from the team's task-allocation document (cross-checked
 against the per-workstream owners already recorded in [TODO.md](TODO.md)):
