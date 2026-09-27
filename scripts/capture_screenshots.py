@@ -21,8 +21,17 @@ Scenarios (see SCENES at the bottom for the exact list and expected verdicts):
 Usage (repo root, venv active, UI built with `cd frontend && pnpm build`):
     python -m pip install -e "backend[evidence]" && python -m playwright install chromium
     PYTHONPATH=backend python scripts/capture_screenshots.py [--out evidence/screenshots/gui] [--url URL]
+    PYTHONPATH=backend python scripts/capture_screenshots.py --only samples sealed [--out DIR]
 
 Without --url it starts its own server on a free port and stops it afterwards.
+
+A full run writes to the committed evidence/screenshots/gui by default, then
+deletes every screenshot there that it did not take itself (a renamed scene,
+or one that failed this time), so the folder always matches the new
+manifest.json. --only runs a subset (keys always runs first, as the others
+need its key pair) and never touches the committed evidence: without --out it
+writes to a new temporary folder and prints its path. An unknown scene name
+is an error, not a silent no-op.
 """
 
 from __future__ import annotations
@@ -45,6 +54,7 @@ from playwright.sync_api import Browser, Locator, Page, expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "samples"
+EVIDENCE_OUT = ROOT / "evidence" / "screenshots" / "gui"
 PASSPHRASE = "acw1-demo-passphrase-2026"  # demo-only; the same one README documents
 VIEWPORT = {"width": 1440, "height": 900}
 TIMEOUT_MS = 60_000
@@ -94,6 +104,7 @@ class Run:
     out: Path
     work: Path
     results: list[dict] = field(default_factory=list)
+    taken: set[str] = field(default_factory=set)  # every screenshot this run wrote, listed or not
     private_key: Path | None = None
     public_key: Path | None = None
 
@@ -111,6 +122,7 @@ class Run:
         path = self.out / f"{name}.jpg"
         page.wait_for_timeout(250)  # let fonts/transitions settle
         page.screenshot(path=path, full_page=True, type="jpeg", quality=85)
+        self.taken.add(path.name)
         return path.name
 
     def record(self, scene: str, screenshot: str, expected: str, observed: str, detail: str = "") -> None:
@@ -444,6 +456,7 @@ SCENES = [
     scene_steganalysis,
     scene_lsb_depth,
 ]
+SCENE_NAMES = [scene.__name__.removeprefix("scene_") for scene in SCENES]  # the names --only takes
 
 
 def write_index(out: Path, manifest: dict) -> None:
@@ -474,12 +487,53 @@ def write_index(out: Path, manifest: dict) -> None:
     (out / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def prune_stale(out: Path, taken: set[str]) -> list[str]:
+    """Delete the screenshots in `out` that this run did not take (`taken`), so
+    the folder matches the new manifest: no leftovers from renamed scenes, and
+    no old passing shot next to a row that failed this time. Intermediate shots
+    that no row lists (50-attack-lab-flip_bits.jpg) were taken, so they stay.
+    Returns the names deleted."""
+    stale = sorted(path.name for path in out.glob("*.jpg") if path.name not in taken)
+    for name in stale:
+        (out / name).unlink()
+    return stale
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--out", type=Path, default=ROOT / "evidence" / "screenshots" / "gui")
+    parser.add_argument(
+        "--out",
+        type=Path,
+        help="output folder (default: evidence/screenshots/gui; with --only, a new temporary folder)",
+    )
     parser.add_argument("--url", help="use an already-running server instead of starting one")
-    parser.add_argument("--only", nargs="*", help="run only these scenes, e.g. --only samples sealed")
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="SCENE",
+        help=f"run only these scenes, e.g. --only samples sealed. Scenes: {', '.join(SCENE_NAMES)}",
+    )
     args = parser.parse_args()
+    scenes = SCENES
+    if args.only:
+        wanted = {name.removeprefix("scene_") for name in args.only}
+        unknown = sorted(wanted - set(SCENE_NAMES))
+        if unknown:
+            parser.error(f"unknown scene(s): {', '.join(unknown)}. Choose from: {', '.join(SCENE_NAMES)}")
+        scenes = [s for s in SCENES if s.__name__.removeprefix("scene_") in wanted | {"keys"}]
+        # A subset would rewrite the committed manifest and README with a partial table.
+        if args.out is None:
+            args.out = Path(tempfile.mkdtemp(prefix="gui-screenshots-"))
+            print(f"--only without --out: writing to {args.out} (the committed evidence is left alone)")
+        elif args.out.resolve() == EVIDENCE_OUT.resolve():
+            parser.error("--only writes a partial manifest, so --out cannot be the committed evidence")
+    elif args.out is None:
+        args.out = EVIDENCE_OUT
+    # A full run owns the evidence folder, or one an earlier run of this script wrote (it holds
+    # a manifest.json), and prunes old screenshots there afterwards. Any other folder is only added to.
+    prune = not args.only and (
+        args.out.resolve() == EVIDENCE_OUT.resolve() or (args.out / "manifest.json").is_file()
+    )
     args.out.mkdir(parents=True, exist_ok=True)
 
     server = None
@@ -490,10 +544,6 @@ def main() -> int:
         with tempfile.TemporaryDirectory() as work, sync_playwright() as p:
             browser = p.chromium.launch()
             run = Run(browser=browser, url=url.rstrip("/"), out=args.out, work=Path(work))
-            scenes = SCENES
-            if args.only:
-                wanted = {f"scene_{name}" for name in args.only} | {"scene_keys"}
-                scenes = [s for s in SCENES if s.__name__ in wanted]
             for scene in scenes:
                 print(f"{scene.__name__}")
                 try:
@@ -516,6 +566,10 @@ def main() -> int:
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     write_index(args.out, manifest)
+    if prune:
+        stale = prune_stale(args.out, run.taken)
+        if stale:
+            print(f"removed {len(stale)} old screenshot(s) this run did not take: {', '.join(stale)}")
     failed = [r for r in run.results if not r["ok"]]
     print(f"\n{len(run.results) - len(failed)}/{len(run.results)} scenes matched; screenshots in {args.out}")
     return 1 if failed else 0

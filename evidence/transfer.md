@@ -55,10 +55,15 @@ From the repository root:
 PYTHONPATH=backend .venv/bin/python scripts/transfer_demo.py --out evidence/transfer
 ```
 
-Re-running replaces everything under `evidence/transfer/`. Each payload
-carries a fresh nonce and timestamp by design, so stego bytes and SHA-256
-values change on every run. Every check must still pass. The values below
-come from the run at 2026-09-27T13:28:08Z:
+A re-run builds everything in a hidden folder next to `evidence/transfer/`
+and swaps in the files it generates (`party-a/`, `party-b/`, the report and
+the log) only once every check has passed. Any other file in that folder is
+kept. A run that is refused (for example, because the private key is
+missing), crashes or fails a check leaves `evidence/transfer/` exactly as it
+was, and a failing run says where its own files went. Each payload carries a
+fresh nonce and timestamp by design, so stego bytes and SHA-256 values change
+on every run. Every check must still pass. The values below come from the run
+at 2026-09-27T13:28:08Z:
 [report](transfer/transfer-report.json), [log](transfer/transfer-log.txt).
 
 ## Settings
@@ -82,7 +87,9 @@ committed sample report Signature Invalid. The private half is at
 `keys/private/transfer-demo_ed25519.pem`, which is gitignored and never
 copied into `evidence/`. If only one half of the pair is present, the script
 refuses to run. With `--regenerate-key` it creates a new pair. Commit the new
-public key together with the regenerated evidence.
+public key together with the regenerated evidence. The new pair is written
+before the run starts, so even a failing run with that flag has already
+replaced the key pair; re-run until it passes before committing.
 
 ## Results
 
@@ -166,23 +173,40 @@ if it finds any.
 
 ## Reproduce in the GUI
 
-These are the settings the live walkthrough should mirror.
+### Re-verify the recorded files
 
-1. Protect: upload the cover, message = contents of `samples/payloads/custom.txt`,
-   encrypt on, 2 LSBs, start **Derived from passphrase**, passphrase
-   `acw1-demo-passphrase-2026`, media ID `P-transfer-image` (or
-   `P-transfer-audio`). Sign with the transfer or team private key, whichever
-   is on the demo machine.
-2. Verify: upload `transfer/party-b/downloads/transfer-image.stego.png`, public
+The recorded run used media IDs `P-transfer-image` and `P-transfer-audio`.
+Those IDs are signed into these files and, in derived mode, decide where the
+frame starts, so they are the right ones for re-verifying them and for nothing
+else.
+
+1. Verify: upload `transfer/party-b/downloads/transfer-image.stego.png`, public
    key `keys/public/transfer-demo.pub.pem`, media ID `P-transfer-image`,
    2 LSBs, Derived from passphrase, the passphrase above. Expect Authentic and
    the decrypted message. Compare the file's SHA-256 chip with the table above.
-3. Repeat with `transfer/party-b/tampered/transfer-image.high-bit-flipped.png`
+2. Repeat with `transfer/party-b/tampered/transfer-image.high-bit-flipped.png`
    (expect Tampered) and with a wrong passphrase (expect Wrong Start Location).
+3. The audio file works the same way with media ID `P-transfer-audio`.
 
-A live demo that signs with a different private key must verify with that
-key's public half. Files protected live will have different SHA-256 values
-from this table.
+### The live walkthrough (demo plan row 6)
+
+The live two-machine transfer follows
+[docs/demo-plan.md](../docs/demo-plan.md) row 6, not the recorded run's IDs:
+
+1. Party A protects `samples/image/original/cover.png` with media ID
+   **`P6-8-transfer`** (if the audio file goes in the same email, protect
+   `samples/audio/original/cover.wav` with **`P6-8-transfer-audio`**). The rest
+   matches the recorded run: message = contents of
+   `samples/payloads/custom.txt`, encrypt on, 2 LSBs, start **Derived from
+   passphrase**, passphrase `acw1-demo-passphrase-2026`. Sign with the key pair
+   generated on the Keys tab in demo row 2.
+2. Party B verifies the downloaded file with that key pair's public half, the
+   same media ID, 2 LSBs, Derived from passphrase and the passphrase, after
+   comparing the SHA-256 party A read out.
+
+Both parties must type exactly the same media ID. A different one moves the
+derived start, so an intact file then verifies as Wrong Start Location.
+Files protected live have different SHA-256 values from the table above.
 
 ## Scope
 
@@ -219,7 +243,7 @@ private key or type the passphrase into the email.
 
 [`backend/tests/test_transfer_demo.py`](../backend/tests/test_transfer_demo.py)
 runs the whole round trip into a temporary folder with a throwaway key pair,
-in about 1 second. Its 8 tests cover:
+in a few seconds. Its 16 tests cover:
 
 - SHA-256 match on both sides
 - base64 attachments and no passphrase in the email
@@ -230,3 +254,7 @@ in about 1 second. Its 8 tests cover:
 - no private key in the output
 - SMTP dot-unstuffing and refusal of unknown mailboxes
 - refusal to replace a public key whose private half is missing
+- a re-run replacing the generated files and keeping any other file
+- the existing output left untouched when the private key or an input file is
+  missing, when a check fails and when the run crashes midway, and a rollback
+  if swapping the new files in fails

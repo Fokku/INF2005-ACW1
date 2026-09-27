@@ -147,8 +147,9 @@ export function StartLocationPanel({
             Encrypts the whole embedded frame, header and magic marker included, with AES-256-CTR under
             a third key from the passphrase. Without the passphrase nobody can scan the LSB plane for
             the payload, read its fields, or even confirm it exists. Party B's Verify tab detects the
-            seal on its own. The trade-off: a wrong passphrase then reports Payload Missing rather than
-            Wrong Start Location.
+            seal on its own, but needs the passphrase even with an explicit offset. The trade-off: a
+            wrong passphrase then reports Payload Missing (or Cannot Verify on large covers, where the
+            search stops before it can prove absence) rather than Wrong Start Location.
           </p>
         </div>
       )}

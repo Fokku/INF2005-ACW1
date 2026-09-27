@@ -130,7 +130,14 @@ class CapacityReport(BaseModel):
     capacity_bits: int = Field(description="total_elements * n_lsb")
     capacity_bytes: int
     frame_overhead_bytes: int = Field(
-        description="header + signature + CRC, i.e. bytes not available for the message"
+        description="every byte of one copy's share of the cover the message cannot use: the frame "
+        "(header, signed payload fields, signature, CRC, seal nonce), this message's base64/encryption "
+        "inflation, and start_reserve_bytes"
+    )
+    start_reserve_bytes: int = Field(
+        default=0,
+        description="the part of frame_overhead_bytes lost before the start offset (explicit offset, or the "
+        "worst case for a derived start) and to element rounding; shown separately in the GUI",
     )
     max_message_bytes: int
     payload_bytes: int | None = Field(

@@ -42,16 +42,20 @@ and the GUI share one implementation.
 - **Sealed frames remove that structure, not the detection.** The optional sealed
   frame (Yeo Kai Yuan's advanced start-location option) encrypts the whole frame,
   wrapper included, with AES-256-CTR. Measured with `analyze_elements` at
-  16,384-element windows and a 20,000-byte encrypted message at start 20,000
-  ([start-location.md §7.8](start-location.md#78-limitations-evaluation)):
-  - On a photo-like 8-bit image the byte-phase signal is gone: flagged windows drop
-    from 11/48 to 0/48 at 1 LSB and from 6/48 to 0/48 at 2 LSBs. Chi-square gets
-    stronger instead. Every window inside the sealed region scores p = 1.0, against
-    p < 1e-60 in every window outside it, so the region and its approximate start and
-    length are still found at window resolution.
-  - On 16-bit synthetic audio neither test separates a sealed region (0/21 phase
-    windows, against 11/21 unsealed), because natural 16-bit low bits already look
-    like noise.
+  16,384-element windows and a 20,000-byte encrypted message at explicit start
+  20,000, over twenty runs with the same window counts each time (exact setup in
+  [start-location.md §7.8](start-location.md#78-limitations-evaluation)):
+  - On a photo-like 8-bit image (`natural_cover()`) the byte-phase signal is gone:
+    flagged windows drop from 14/48 to 0/48 at 1 LSB and from 7/48 to 0/48 at
+    2 LSBs. (The demo log above shows 11/48 and 6/48 unsealed because its message
+    is the shorter 15,395-byte spec file.) Chi-square gets stronger instead.
+    Every window wholly inside the sealed region scores p above about 0.97
+    (typically above 0.99; the exact value varies with the random ciphertext),
+    against p ≤ 7.0e-61 in every window outside it, so the region and its
+    approximate start and length are still found at window resolution.
+  - On 16-bit synthetic audio (tones plus noise) neither test separates a sealed
+    region (0/21 phase windows, against 14/21 at 1 LSB and 7/21 at 2 LSBs unsealed),
+    because natural 16-bit low bits already look like noise.
 
   LSB replacement statistics do not depend on the content, so no encryption can hide
   *that* something was embedded. Sealing does not pad either, so the region's length
@@ -95,7 +99,12 @@ and the GUI share one implementation.
 - **Capacity and perception:** larger payloads, metadata and Base64/encryption
   overhead consume capacity. Higher LSB counts reduce image/audio fidelity and
   the content retained by the hash. The final actual frame must fit after the
-  start offset; the UI estimate is approximate.
+  start offset. `/api/capacity` and the GUI's meter count every byte Protect
+  embeds, with the typed media ID and metadata. With an explicit start, the
+  largest message they report protects and one byte more does not. With a
+  derived start they assume the latest offset any passphrase can produce (about
+  a tenth of the cover in), so they can understate the room for a particular
+  passphrase. The CLI's `stego capacity` still uses a rough fixed allowance.
 - **Keys and freshness:** public-key identity needs an external trust process.
   There is no key revocation or replay cache. Nonces/timestamps alone do not
   reject a repeated authentic file.

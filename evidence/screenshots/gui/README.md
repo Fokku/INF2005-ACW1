@@ -7,7 +7,7 @@ Chromium (Playwright) and asserts every verdict. Regenerate with:
 PYTHONPATH=backend python scripts/capture_screenshots.py
 ```
 
-Generated 2026-09-27T13:45:21+00:00 at 1440x900; full-page captures. `manifest.json` holds the same table as data.
+Generated 2026-09-27T15:40:23+00:00 at 1440x900; full-page captures. `manifest.json` holds the same table as data.
 
 | Screenshot | Scenario | Expected | Observed | Result |
 | --- | --- | --- | --- | --- |

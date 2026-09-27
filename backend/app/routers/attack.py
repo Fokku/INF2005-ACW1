@@ -1,10 +1,17 @@
-"""Generate controlled negative verification cases for the Attack Lab."""
+"""Generate controlled negative verification cases for the Attack Lab.
+
+`redundancy` is the copy count the target was protected with (robust
+embedding, see stego_core/ecc.py). corrupt_payload and replay need it to
+change or carry every copy; the other attacks never read the frame and
+ignore it. It is validated for every attack, like /api/protect and
+/api/verify do, so a bad value is a 400 whichever attack was picked.
+"""
 
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from stego_core import attacks
+from stego_core import attacks, ecc
 
 from .. import storage
 from ..schemas import AttackKind, AttackResult, FileRef
@@ -33,7 +40,16 @@ async def run_attack(
         description="the target holds a sealed frame: corrupt_payload and replay then run their key-less "
         "variants (see stego_core.attacks)",
     ),
+    redundancy: int = Form(
+        1,
+        description="copies of the frame the target was protected with: 1 (off), 3, 5, 7 or 9; "
+        "corrupt_payload and replay change or carry every copy",
+    ),
 ) -> AttackResult:
+    try:
+        ecc.validate_redundancy(redundancy)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     kind = _sniff_kind(stego.filename or "")
     data = await stego.read()
     name = attack.value
@@ -50,7 +66,9 @@ async def run_attack(
         elif attack == AttackKind.reencode:
             output = attacks.reencode(data, kind.value)
         elif attack == AttackKind.corrupt_payload:
-            output = attacks.corrupt_payload(data, kind.value, n_lsb, start_offset, sealed=sealed)
+            output = attacks.corrupt_payload(
+                data, kind.value, n_lsb, start_offset, sealed=sealed, redundancy=redundancy
+            )
         elif attack == AttackKind.lsb_noise:
             output = attacks.lsb_noise(data, kind.value, n_lsb)
         else:
@@ -59,7 +77,13 @@ async def run_attack(
             if _sniff_kind(other_cover.filename or "") != kind:
                 raise ValueError("replay target must have the same cover kind")
             output = attacks.replay(
-                data, await other_cover.read(), kind.value, n_lsb, start_offset, sealed=sealed
+                data,
+                await other_cover.read(),
+                kind.value,
+                n_lsb,
+                start_offset,
+                sealed=sealed,
+                redundancy=redundancy,
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

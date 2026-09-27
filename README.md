@@ -5,7 +5,7 @@ A GUI-based **LSB-replacement steganography** tool that protects a PNG image and
 
 > **Status: demo-ready.** The web UI, the API and the full protect → verify round trip (LSB
 > embed/extract, hashing, Ed25519 signing, start-location derivation, all six verdicts) work end to
-> end for image, audio and video covers — **806 backend tests green** (`./scripts/check.sh`). Every
+> end for image, audio and video covers — **938 backend tests green** (`./scripts/check.sh`). Every
 > scenario the demo needs is also exercised in the real GUI by a Playwright run that asserts each
 > verdict: **38/38 scenes pass**, screenshots in [`evidence/screenshots/gui/`](evidence/screenshots/gui/README.md).
 > Optional challenges done: video cover, attack simulation, robust embedding, steganalysis, and the
@@ -31,26 +31,29 @@ matches xSite before submission.
 | Muhammad Ridwan Putra Jasni |
 | Yeo Kai Yuan |
 
-Task ownership by functional requirement, from the team's task-allocation document (cross-checked
-against the per-workstream owners already recorded in [TODO.md](TODO.md)):
+Task ownership by functional requirement. The **Allocated** column is copied from the team's
+task-allocation document (cross-checked against the per-workstream owners recorded in
+[TODO.md](TODO.md)). The **Added later** column and the last two rows are **not** from that
+document: they were added afterwards from the work recorded in TODO.md and the contribution
+statement, and the team confirms them together with the contribution percentages.
 
-| FR | Owner |
-| --- | --- |
-| FR1 – Image input | Ke Ying |
-| FR2 – Audio input | Ke Ying |
-| FR3 – Payload generation | Wen Xuan |
-| FR4 – Digital signature | Wen Xuan |
-| FR5 – Image steganographic embedding | Zong Han |
-| FR6 – Audio steganographic embedding | Zong Han |
-| FR7 – Variable start location | Ridwan / Zong Han |
-| FR8 – Extraction and decoding | Ridwan / Zong Han |
-| FR9 – Hash verification | Ridwan / Zong Han |
-| FR10 – Verdict generation | Zong Han |
-| FR11 – Positive and negative cases | Kannan / Zong Han / Kai Yuan ( |
-| FR12 – Evidence and reproducibility | All — Wen Xuan (samples), Kannan (FR11 evidence), Kai Yuan (GUI screenshots, transfer evidence) |
-| FR13 – Innovation | Zong Han (start location), Kannan (attack lab), Wen Xuan (robust embedding), Kai Yuan (sealed frame) |
-| Project architecture and scaffold (web UI, API, module structure, team plan) | Kai Yuan |
-| Optional challenges (spec Section 8) | Ke Ying (video cover, steganalysis), Kannan (attack simulation), Wen Xuan (robust embedding), Kai Yuan (advanced start-location security: sealed frame) |
+| FR | Allocated (task-allocation document) | Added later (to be confirmed by the team) |
+| --- | --- | --- |
+| FR1 – Image input | Ke Ying | |
+| FR2 – Audio input | Ke Ying | |
+| FR3 – Payload generation | Wen Xuan | |
+| FR4 – Digital signature | Wen Xuan | |
+| FR5 – Image steganographic embedding | Zong Han | |
+| FR6 – Audio steganographic embedding | Zong Han | |
+| FR7 – Variable start location | Ridwan / Zong Han | |
+| FR8 – Extraction and decoding | Ridwan / Zong Han | |
+| FR9 – Hash verification | Ridwan / Zong Han | |
+| FR10 – Verdict generation | Zong Han | |
+| FR11 – Positive and negative cases | Kannan / Zong Han | Kai Yuan (party A → B transfer evidence) |
+| FR12 – Evidence and reproducibility | All | Wen Xuan (samples), Kannan (FR11 evidence), Kai Yuan (GUI screenshots, transfer evidence) |
+| FR13 – Innovation | Zong Han (start location), Kannan (attack lab) | Wen Xuan (robust embedding), Kai Yuan (sealed frame) |
+| Project architecture and scaffold (web UI, API, module structure, team plan) | — | Kai Yuan |
+| Optional challenges (spec Section 8) | — | Ke Ying (video cover, steganalysis), Kannan (attack simulation), Wen Xuan (robust embedding), Kai Yuan (advanced start-location security: sealed frame) |
 
 The full per-member breakdown, with the files each person wrote, is in
 [docs/contribution-distribution-statement.md](docs/contribution-distribution-statement.md).
@@ -139,13 +142,24 @@ the UI needs it.
 All from the repo root with the venv active:
 
 ```bash
-PYTHONPATH=backend python scripts/make_samples.py                  # samples/ + evidence/logs/sample-manifest.json
+PYTHONPATH=backend python scripts/make_samples.py                  # samples/ + evidence/logs/sample-manifest.json (team key holder only, see "Keys")
 PYTHONPATH=backend python scripts/make_video_cover.py              # samples/video/original/cover.avi
 PYTHONPATH=backend python scripts/transfer_demo.py --out evidence/transfer   # party A -> B email round trip
-PYTHONPATH=backend python scripts/generate_verification_evidence.py          # evidence/fr10-fr11/
+PYTHONPATH=backend python scripts/generate_verification_evidence.py --output /tmp/fr10-fr11-rerun   # FR10/FR11 cases
 # GUI screenshots (needs the UI built and, once: pip install -e "backend[evidence]" && python -m playwright install chromium)
 PYTHONPATH=backend python scripts/capture_screenshots.py           # evidence/screenshots/gui/, asserts every verdict
 ```
+
+`generate_verification_evidence.py` requires `--output` and refuses a folder that already exists,
+so it never overwrites the committed `evidence/fr10-fr11/`. Give it a new folder, then compare its
+`manifest.json` with `evidence/fr10-fr11/manifest.json`: all 18 cases should give the same verdict
+(or, for the two oversized cases, the same capacity refusal). The stego bytes, keys and hashes
+differ on every run (fresh nonce, timestamp and key pair), and the oversized cases now report a
+smaller `max_message_bytes`, because `/api/capacity` counts exactly what Protect embeds (see
+`docs/design/api-contract.md`, "Capacity accuracy").
+`transfer_demo.py` replaces its generated files in `--out` only after every check passes, and
+`capture_screenshots.py --only NAME…` runs a subset into a temporary folder, never into the
+committed evidence.
 
 ### Expected outputs
 
@@ -165,7 +179,7 @@ output is neither possible nor desirable (the signed payload includes a fresh no
 every time by design).
 
 All cases below use `n_lsb=2` and the demo key pair at `keys/public/team_ed25519.pub.pem`
-(private half gitignored under `keys/private/`, regenerated locally by the script above).
+(private half gitignored under `keys/private/`; see "Keys" below for who may regenerate it).
 To reproduce a case through the **GUI**: open the Verify tab, choose it under **Load a demo sample**
 (file, media ID, LSB count, start mode, passphrase and public key are filled in), and press
 **Extract and verify**. The media IDs are `P6-8-image-short`, `P6-8-audio-large` and so on — the
@@ -199,11 +213,13 @@ attack-driven negative cases (`crop`, `lsb_scrub`, `reencode`, `corrupt_payload`
 screenshots.
 
 Beyond the curated files, the GUI run in [`evidence/screenshots/gui/`](evidence/screenshots/gui/README.md)
-records (and asserts) the live flows: protect → download → verify in a second browser session with
-the SHA-256 compared, the capacity block for image and audio, the AVI video cover, Attack Lab →
-Verify, robust embedding (1 copy + `lsb_noise` → Tampered; 3 copies → Authentic), and the sealed
-frame (right passphrase → Authentic; wrong passphrase → Cannot Verify on the 512×512 cover, because
-a sealed frame cannot be found without the passphrase; steganalysis finds no byte pattern in it).
+verifies the curated files through **Load a demo sample** (all six verdicts for image, five for
+audio: Cannot Verify is image-only) and records (and asserts) the live flows: protect → download →
+verify in a second browser session with the SHA-256 compared, the capacity block for image and
+audio, the AVI video cover, Attack Lab → Verify, robust embedding (1 copy + `lsb_noise` → Tampered;
+3 copies → Authentic), and the sealed frame (right passphrase → Authentic; wrong passphrase → Cannot
+Verify on the 512×512 cover, because a sealed frame cannot be found without the passphrase;
+steganalysis finds no byte pattern in it).
 
 **Party A → party B transfer:** [`evidence/transfer.md`](evidence/transfer.md) records a real
 RFC 5322 email with both stego files as base64 MIME attachments, delivered over SMTP to a Maildir on
@@ -215,9 +231,9 @@ added after rehearsal — checklist in `evidence/transfer.md`.
 ## Keys
 
 - The team's **public key** lives in `keys/public/` and is what a verifier (and the marker) uses.
-- The **private key** used for the demo is generated only for this assignment, kept in `keys/private/`, and is gitignored. `scripts/make_samples.py` generates the pair automatically the first time it runs (via `stego_core.signing.generate_keypair`) if `keys/private/team_ed25519.pem` doesn't already exist. Anyone cloning the repository can delete `keys/private/` and re-run the script for a fresh pair; the samples under `samples/` then regenerate and verify against the new public key. `stego keygen --out keys --label team` (see `backend/stego_core/cli.py`) does the same from the command line.
+- The **private key** used for the demo is generated only for this assignment, kept in `keys/private/`, and is gitignored. `scripts/make_samples.py` generates the pair automatically the first time it runs (via `stego_core.signing.generate_keypair`) if `keys/private/team_ed25519.pem` doesn't already exist. Anyone cloning the repository can delete `keys/private/` and re-run the script for a fresh pair; the samples under `samples/` then regenerate and verify against the new public key. For a personal key pair on the command line, use `stego keygen --out keys --label <yourname>` (see `backend/stego_core/cli.py`). Never use the default label `team` for that: `keygen` refuses to overwrite an existing key file, either half, unless given `--force`, and forcing it over the committed `team_ed25519.pub.pem` makes every curated sample report Signature Invalid.
 - **Only the holder of `keys/private/team_ed25519.pem` should re-run `make_samples.py`.** On a machine without it, the script creates a *new* pair and re-signs every sample, so `samples/` and the committed public key change together (consistent, but a large diff). For live demos, generate a key pair on the Keys tab and use it for Protect; the curated samples keep verifying against `team_ed25519.pub.pem`, which the Verify tab's sample loader selects automatically.
-- `keys/public/section-f-demo.pub.pem` (Attack Lab evidence) and `keys/public/transfer-demo.pub.pem` (email transfer evidence) are separate demo keys; the sample loader uses the Section F key as the deliberately *wrong* key for the Signature Invalid case.
+- `keys/public/section-f-demo.pub.pem` (Attack Lab evidence) and `keys/public/transfer-demo.pub.pem` (email transfer evidence) are separate demo keys; the sample loader uses the Section F key as the deliberately *wrong* key for the Signature Invalid case. It did not sign the short-message samples those cases pair it with (the team key did); it signed only the Section F replay files (`samples/audio/stego/section-f-replay-source.wav`, replayed into `samples/audio/tampered/section-f-replay.wav`), which are not sample-loader cases.
 
 ## Deadlines
 

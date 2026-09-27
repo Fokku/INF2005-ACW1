@@ -39,8 +39,8 @@ tmp/
 out/
 
 # ---- Build output ----
-# Ignored during development. At feature freeze, force-add it on the submission
-# tag (`git add -f frontend/dist`) so the marker needs only Python, no Node.
+# Never committed. scripts/package_submission.sh builds the UI and puts that
+# fresh frontend/dist in the submission archive, so the marker needs only Python.
 frontend/dist/
 
 # ---- Submission archive (scripts/package_submission.sh) ----

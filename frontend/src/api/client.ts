@@ -66,12 +66,23 @@ function form(fields: Record<string, string | number | boolean | File | null | u
 export const api = {
   health: () => request<HealthResponse>('/api/health'),
 
+  /**
+   * The media ID, metadata, encryption flag and start settings are optional
+   * but make the answer exact: they all change how many bytes the frame needs
+   * and where it may begin, so with them `fits` agrees with what Protect will do.
+   */
   capacity: (args: {
     cover: File
     nLsb: number
     payloadBytes?: number
     redundancy: number
     sealFrame?: boolean
+    mediaId?: string
+    metadataJson?: string
+    encryptMessage?: boolean
+    startMode?: StartMode
+    /** Sent only in explicit mode; a derived start is sized for the worst case. */
+    explicitStart?: number
   }) =>
     request<CapacityReport>('/api/capacity', {
       method: 'POST',
@@ -81,6 +92,11 @@ export const api = {
         payload_bytes: args.payloadBytes,
         redundancy: args.redundancy,
         seal_frame: args.sealFrame,
+        media_id: args.mediaId,
+        metadata_json: args.metadataJson,
+        encrypt_message: args.encryptMessage,
+        start_mode: args.startMode,
+        explicit_start: args.startMode === 'explicit' ? args.explicitStart : undefined,
       }),
     }),
 
@@ -155,6 +171,8 @@ export const api = {
     startOffset: number
     otherCover?: File
     sealed?: boolean
+    /** Copies of the frame in the target: corrupt_payload and replay must damage or move all of them. */
+    redundancy: number
   }) =>
     request<AttackResult>('/api/attack', {
       method: 'POST',
@@ -165,6 +183,7 @@ export const api = {
         start_offset: args.startOffset,
         other_cover: args.otherCover,
         sealed: args.sealed,
+        redundancy: args.redundancy,
       }),
     }),
 

@@ -65,6 +65,10 @@ _STREAM_FORMAT = struct.Struct("<HHIIHH")  # WAVEFORMATEX, first 16 bytes
 _BITMAPINFOHEADER = struct.Struct("<IiiHHIIiiII")  # first 40 bytes of BITMAPINFOHEADER
 _AVI_MAIN_HEADER = struct.Struct("<IIIIIIIIIIIIII")  # MainAVIHeader, 14 x uint32
 _WAVE_FORMAT_PCM = 1
+# WAVEFORMATEX with the plain PCM tag describes mono or stereo; more channels
+# officially need WAVE_FORMAT_EXTENSIBLE, and 7.1 surround (8) is the most any
+# real encoder writes. A larger count only comes from a corrupt header.
+_MAX_CHANNELS = 8
 
 
 @dataclass
@@ -134,7 +138,8 @@ def load_avi(data: bytes) -> VideoCover:
     """Decode an AVI file's uncompressed PCM audio track into a sample array.
 
     Raises `UnsupportedCoverError` if the file is not a RIFF/AVI container,
-    has no audio stream, or that stream is not 8/16-bit PCM.
+    has no audio stream, that stream is not 8/16-bit PCM, or its format header
+    declares an impossible channel count or sample rate.
     """
     if len(data) < 12 or data[0:4] != b"RIFF" or data[8:12] != b"AVI ":
         raise UnsupportedCoverError("could not decode video data as AVI (RIFF/'AVI ' container)")
@@ -190,6 +195,18 @@ def load_avi(data: bytes) -> VideoCover:
             "`ffmpeg -i input.mp4 -c:v copy -c:a pcm_s16le -ar 44100 output.avi`"
         )
 
+    # The WAVEFORMATEX fields are taken on trust from the file, so a corrupt or
+    # hand-edited header must stop here as an unsupported cover. Left through,
+    # 0 channels or 0 Hz later fails inside `wave` (audio_codec.save_wav, used by
+    # the AVI audio-track preview) as a raw library error, i.e. an HTTP 500. A
+    # WAV header also stores the byte rate (channels * rate * width) in 32 bits.
+    if not 1 <= channels <= _MAX_CHANNELS:
+        raise UnsupportedCoverError(
+            f"AVI audio track declares {channels} channels; expected 1 to {_MAX_CHANNELS}"
+        )
+    if sample_rate < 1 or channels * sample_rate * sample_width > 0xFFFFFFFF:
+        raise UnsupportedCoverError(f"AVI audio track declares an impossible sample rate ({sample_rate} Hz)")
+
     wanted_tag = f"{audio_stream_index:02d}wb".encode("ascii")
     chunk_spans: list[tuple[int, int]] = []
     pcm_parts: list[bytes] = []
@@ -214,7 +231,7 @@ def load_avi(data: bytes) -> VideoCover:
     dtype = np.uint8 if sample_width == 1 else np.int16
     arr = np.frombuffer(raw_pcm, dtype=dtype)
     elements = arr if sample_width == 1 else arr.view(np.uint16)
-    frames = len(elements) // channels if channels else 0
+    frames = len(elements) // channels
 
     return VideoCover(
         elements=elements.copy(),

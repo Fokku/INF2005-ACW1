@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, fetchAsFile } from '../api/client'
 import { CapacityMeter } from '../components/CapacityMeter'
 import { DownloadButton } from '../components/DownloadButton'
@@ -15,6 +15,7 @@ import { RedundancySelector } from '../components/RedundancySelector'
 import { StartLocationPanel } from '../components/StartLocationPanel'
 import { StepSection } from '../components/StepSection'
 import { SAMPLE_PAYLOADS } from '../lib/samplePayloads'
+import { useObjectUrl } from '../lib/useObjectUrl'
 import type {
   AttackPrefill,
   CapacityReport,
@@ -23,6 +24,9 @@ import type {
   StartMode,
   VerifyPrefill,
 } from '../types'
+
+/** How long the capacity check waits for typing to pause before asking the backend. */
+const CAPACITY_DEBOUNCE_MS = 250
 
 /**
  * Party A: hide a signed verification payload inside a cover object.
@@ -45,6 +49,9 @@ export function ProtectPage({
   const [messageText, setMessageText] = useState(SAMPLE_PAYLOADS[0].text)
   const [nLsb, setNLsb] = useState(1)
   const [mediaId, setMediaId] = useState('')
+  // True while the media ID is the default this page filled in (the cover's
+  // file name), so choosing another cover replaces it; typing one keeps it.
+  const [mediaIdAuto, setMediaIdAuto] = useState(true)
   const [metadataJson, setMetadataJson] = useState('{"team": "INF2005 ACW1", "purpose": "release check"}')
   const [startMode, setStartMode] = useState<StartMode>('derived')
   const [passphrase, setPassphrase] = useState('')
@@ -54,6 +61,7 @@ export function ProtectPage({
   const [redundancy, setRedundancy] = useState(1)
 
   const [capacityData, setCapacityData] = useState<CapacityReport | null>(null)
+  const [capacityError, setCapacityError] = useState<string | null>(null)
   const [result, setResult] = useState<ProtectResult | null>(null)
   // The settings the current result was produced with (the form may change afterwards).
   const [resultSettings, setResultSettings] = useState<{ mediaId: string; startMode: StartMode } | null>(null)
@@ -61,10 +69,7 @@ export function ProtectPage({
   const [busy, setBusy] = useState(false)
   const [handingOff, setHandingOff] = useState(false)
 
-  const coverUrl = useMemo(() => (cover ? URL.createObjectURL(cover) : null), [cover])
-  useEffect(() => () => {
-    if (coverUrl) URL.revokeObjectURL(coverUrl)
-  }, [coverUrl])
+  const coverUrl = useObjectUrl(cover)
 
   const coverKind = cover?.name.toLowerCase().endsWith('.wav')
     ? 'audio'
@@ -76,24 +81,48 @@ export function ProtectPage({
   // Derived, not stored: with no cover there is nothing to report, and deriving
   // it here avoids resetting state from inside the effect below.
   const capacity = cover ? capacityData : null
+  const capacityProblem = cover ? capacityError : null
 
-  // Re-check capacity whenever the cover, the LSB count, the number of copies
-  // or the seal changes, so the user sees "this will not fit" before pressing Protect.
+  // Re-check capacity whenever anything that sizes the frame or places it
+  // changes, so the user sees "this will not fit" before pressing Protect. The
+  // media ID and metadata are signed into the payload, encryption adds its own
+  // overhead, and the start offset decides how much of the cover is left, so
+  // all of them go along; without them the answer was an optimistic guess.
+  // The request waits for a short pause, so typing sends one, not one per key.
+  const trimmedMediaId = mediaId.trim()
   useEffect(() => {
     if (!cover) return
     let cancelled = false
-    api
-      .capacity({ cover, nLsb, payloadBytes: messageBytes, redundancy, sealFrame: seal })
-      .then((report) => {
-        if (!cancelled) setCapacityData(report)
-      })
-      .catch(() => {
-        if (!cancelled) setCapacityData(null)
-      })
+    const timer = setTimeout(() => {
+      api
+        .capacity({
+          cover,
+          nLsb,
+          payloadBytes: messageBytes,
+          redundancy,
+          sealFrame: seal,
+          mediaId: trimmedMediaId,
+          metadataJson,
+          encryptMessage: encrypt,
+          startMode,
+          explicitStart,
+        })
+        .then((report) => {
+          if (cancelled) return
+          setCapacityData(report)
+          setCapacityError(null)
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          setCapacityData(null)
+          setCapacityError(err instanceof Error ? err.message : 'the capacity check failed')
+        })
+    }, CAPACITY_DEBOUNCE_MS)
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
-  }, [cover, nLsb, messageBytes, redundancy, seal])
+  }, [cover, nLsb, messageBytes, redundancy, seal, trimmedMediaId, metadataJson, encrypt, startMode, explicitStart])
 
   const needsPassphrase = startMode === 'derived' || encrypt || seal
   const blocker = !cover
@@ -113,8 +142,13 @@ export function ProtectPage({
     setResult(null)
     setError(null)
     // The media ID is signed into the payload and must match on Verify, so
-    // show the default instead of hiding it in a placeholder.
-    if (next && (!mediaId || mediaId === cover?.name)) setMediaId(next.name)
+    // show the default instead of hiding it in a placeholder. Verify guesses
+    // the same default from the stego file's name, so a new cover must replace
+    // an auto-filled ID even after the old cover was cleared.
+    if (next && (mediaIdAuto || !mediaId.trim())) {
+      setMediaId(next.name)
+      setMediaIdAuto(true)
+    }
   }
 
   async function onProtect() {
@@ -168,6 +202,8 @@ export function ProtectPage({
           note: resultSettings.startMode === 'derived' || result.payload.message_encrypted || result.sealed
             ? 'Type the shared passphrase — it never travels with the file.'
             : null,
+          // A sealed frame cannot be found without the passphrase, even at an explicit offset.
+          requiresPassphrase: result.sealed,
         })
       } else {
         onAttack({
@@ -178,6 +214,7 @@ export function ProtectPage({
           mediaId: resultSettings.mediaId,
           redundancy: result.redundancy,
           sealed: result.sealed,
+          messageEncrypted: result.payload.message_encrypted,
           publicKeyPem: result.signer_public_key_pem,
           publicKeyLabel: `signer key ${result.signer_fingerprint.slice(0, 12)}…`,
         })
@@ -211,7 +248,10 @@ export function ProtectPage({
               className="input font-exhibit w-full"
               placeholder="e.g. P6-8-cover-001"
               value={mediaId}
-              onChange={(e) => setMediaId(e.target.value)}
+              onChange={(e) => {
+                setMediaId(e.target.value)
+                setMediaIdAuto(false)
+              }}
             />
           </Field>
         </StepSection>
@@ -257,7 +297,7 @@ export function ProtectPage({
         <StepSection num="3" title="Embedding settings">
           <LsbSelector value={nLsb} onChange={setNLsb} />
           <RedundancySelector value={redundancy} onChange={setRedundancy} />
-          <CapacityMeter report={capacity} messageBytes={messageBytes} />
+          <CapacityMeter report={capacity} messageBytes={messageBytes} error={capacityProblem} />
           <StartLocationPanel
             showEncryptionPassphrase={encrypt}
             mode={startMode}

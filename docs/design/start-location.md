@@ -180,7 +180,8 @@ It requires a passphrase in both start modes.
 
 Overhead: 12 bytes per copy. The capacity check and its error message include the nonce
 ("... that includes the 12-byte seal nonce a sealed frame adds to every copy"), and `/api/capacity` with
-`seal_frame=true` adds 12 bytes to `frame_overhead_bytes`, `max_message_bytes` and `fits`.
+`seal_frame=true` counts those 12 bytes in every copy for `frame_overhead_bytes`, `max_message_bytes`
+and `fits`.
 `ProtectResult.frame_bytes` counts what is actually embedded per copy, nonce included.
 
 **Robust embedding (redundancy 3/5/7/9) works unchanged.** An unsealed frame with redundancy is
@@ -299,18 +300,30 @@ not-found verdicts.
    (accidents) and Ed25519 (authenticity), never from the seal.
 2. **Steganalysis still detects that something was embedded.** Measured with
    `stego_core.steganalysis.analyze_elements` (the engine behind `scripts/steganalysis.py`) at
-   16,384-element windows, with a 20,000-byte AES-GCM-encrypted message at start 20,000:
-   - *Photo-like 8-bit image (`natural_cover()`):* sealing removes the byte-phase signal.
-     Flagged windows drop from 11/48 to 0/48 at 1 LSB and from 6/48 to 0/48 at 2 LSBs. However,
-     the Westfeld-Pfitzmann chi-square pairs test gets **stronger**. Every window inside the
-     sealed region scores p = 1.0, against p < 1e-60 in every window outside it, including at
-     2 LSBs, where the unsealed frame's non-uniform bits kept chi-square at about 1e-24 (missed).
+   16,384-element windows: `pipeline.protect` with a 20,000-byte message, `encrypt_message=True`
+   (AES-GCM), explicit start 20,000, and 1 or 2 LSBs, sealed and unsealed. Re-measured with the
+   current frame format over twenty runs, each with a fresh key pair, message and nonces. The
+   flagged-window counts were the same in every run. The chi-square p-values vary with the random
+   ciphertext, and the ranges below cover all twenty runs.
+   - *Photo-like 8-bit image (`natural_cover()`, 512×512 RGB, 48 windows):* sealing removes the
+     byte-phase signal. Flagged windows drop from 14/48 to 0/48 at 1 LSB and from 7/48 to 0/48 at
+     2 LSBs. Unsealed, every window that overlaps the frame is flagged. However, the
+     Westfeld-Pfitzmann chi-square pairs test gets **stronger**. Every window wholly inside the
+     sealed region scores p above about 0.97 (typically above 0.99; the exact value varies with the
+     random ciphertext), against p ≤ 7.0e-61 in every window outside it. That holds at
+     2 LSBs too, where the unsealed frame's non-uniform bits kept chi-square below about 1e-19
+     inside the region (missed). The two edge windows, which mix frame and cover, score in between.
      Ciphertext is uniformly random, which is exactly the model chi-square assumes. The region,
      and so its approximate start and length, can still be found at window resolution.
-   - *16-bit audio (synthetic tones plus noise):* neither test separates a sealed region. The
-     phase test flags 0/21 windows. Chi-square p is 0.42-0.93 inside the region and 0.11-0.92
-     outside it, and some windows have too few value pairs to score. The unsealed frame is flagged
-     in 11/21 windows. The natural low bits of 16-bit audio are already noise-like.
+     (`evidence/logs/steganalysis-demo.txt` shows 11/48 and 6/48 for the unsealed frame on the
+     same cover. That run's message is the 15,395-byte spec file, since the script's `[:20000]`
+     slice keeps the whole file, so its frame is shorter and overlaps fewer windows.)
+   - *16-bit audio (8 s of 44.1 kHz mono: 440, 660 and 1,320 Hz tones at amplitudes 6,000, 3,000
+     and 1,500, plus Gaussian noise with σ = 300; 21 windows):* neither test separates a sealed
+     region. The phase test flags 0/21 windows at either LSB count, against 14/21 (1 LSB) and 7/21
+     (2 LSBs) for the unsealed frame. Chi-square p is 0.7-1.0 inside the sealed region and
+     0.97-1.0 outside it, so it cannot tell them apart. The natural low bits of 16-bit audio are
+     already noise-like.
 
    LSB *replacement* statistics do not depend on the content, so encryption cannot hide that an
    embedding exists. Hiding that would need a different embedding method (for example ±1
@@ -334,17 +347,31 @@ not-found verdicts.
    frame and work on sealed files unchanged. `corrupt_payload` and `replay` locate the payload
    through the plaintext header, and without the key a sealed frame cannot be told apart from an
    empty cover, so they cannot detect one automatically. Both accept `sealed=True` (CLI:
-   `stego tamper --attack corrupt_payload|replay --sealed`) for a key-less variant:
-   - `corrupt_payload` flips the top ciphertext bit of the first payload byte, giving Tampered
-     through the CRC.
-   - `replay` copies every hidden bit from the start offset, giving Tampered at the original
-     explicit offset.
+   `stego tamper --attack corrupt_payload|replay --sealed --start N [--copies r]`) for a key-less
+   variant. The variant cannot find or check the frame, so it must be given the real start offset
+   (the CLI refuses `--sealed` without `--start`) and the copy count the file was protected with
+   (`redundancy` form field on `POST /api/attack`, `--copies` on the CLI, default 1):
+   - `corrupt_payload` with 1 copy flips the top ciphertext bit of the first payload byte. CTR
+     flips the same plaintext bit, the header still opens, and the CRC reports the change:
+     Tampered. With 3 or more copies one flipped body copy would be outvoted, and the body copies
+     are one encrypted frame length apart, which cannot be read without the key. So it flips the
+     top bit of the encrypted version byte in every header-block copy instead, since those copies
+     are a fixed 25 bytes apart. The vote keeps the flip, the magic still decrypts, and the opened
+     header is rejected as an unsupported version: Tampered.
+   - `replay` copies every hidden bit from the start offset to the end of the shorter cover, which
+     carries every copy of the sealed frame when it fits: Tampered at the original explicit offset
+     and copy count. It refuses a start that leaves no room for the sealed header block's copies.
 
-   Without that flag they refuse with an error that explains sealed frames are opaque to them.
+   Without the flag they refuse with an error that explains sealed frames are opaque to them.
    The web Attack Lab passes the flag through its "Target has a sealed frame" checkbox (ticked
    automatically when the target comes from a sealed Protect result; `sealed` form field on
-   `POST /api/attack`); unticked, those two attacks return HTTP 400 with that explanation
-   (`backend/tests/test_attack_sealed_api.py`).
+   `POST /api/attack`), and the copy count through its Copies field, filled in from the target.
+   Unticked, those two attacks return HTTP 400 with that explanation
+   (`backend/tests/test_attack_sealed_api.py`, `backend/tests/test_attack_redundancy.py`). When a
+   sealed result is sent on to Verify, a live Protect's passphrase does not travel with it, so
+   Verify keeps **Extract and verify** disabled until the passphrase is typed. Without it the
+   sealed frame could not be found, and the result would be Payload Missing or Cannot Verify
+   instead of the predicted Tampered.
 
 ### 7.9 Test and demo commands
 
@@ -353,15 +380,32 @@ cd backend
 ../.venv/bin/python -m pytest -q tests/test_sealed_frame.py tests/test_sealed_frame_api.py
 ../.venv/bin/python -m pytest -q                       # full suite: existing tests unchanged
 
-# CLI round trip (the private key is generated locally and never committed)
+# CLI round trip with a throwaway key pair generated locally, outside the repository. Never use
+# the team key here: keys/private/team_ed25519.pem is not on most machines, and forcing a new "team"
+# pair (keygen refuses without --force) would replace the committed public key every curated
+# sample verifies against.
+../.venv/bin/python -m stego_core.cli keygen --out /tmp/sealed-demo-keys --label sealed-demo
 ../.venv/bin/python -m stego_core.cli protect --cover ../samples/image/original/cover.png \
     --message ../samples/payloads/short.txt --lsb 2 --media-id sealed-demo \
-    --key ../keys/private/team_ed25519.pem --passphrase "demo passphrase" --seal --out /tmp/sealed.png
+    --key /tmp/sealed-demo-keys/private/sealed-demo_ed25519.pem \
+    --passphrase "demo passphrase" --seal --out /tmp/sealed.png    # prints "start offset: N"
 ../.venv/bin/python -m stego_core.cli verify --stego /tmp/sealed.png \
-    --pub ../keys/public/team_ed25519.pub.pem --lsb 2 --media-id sealed-demo \
+    --pub /tmp/sealed-demo-keys/public/sealed-demo_ed25519.pub.pem --lsb 2 --media-id sealed-demo \
     --passphrase "demo passphrase"                     # Authentic, "sealed": true
 ../.venv/bin/python -m stego_core.cli verify --stego /tmp/sealed.png \
-    --pub ../keys/public/team_ed25519.pub.pem --lsb 2 --media-id sealed-demo \
+    --pub /tmp/sealed-demo-keys/public/sealed-demo_ed25519.pub.pem --lsb 2 --media-id sealed-demo \
     --passphrase "wrong"      # "sealed": null; Cannot Verify on this 512x512 cover (too big to
                               # scan fully), Payload Missing on a cover under 200,000 elements
+
+# Key-less sealed attack: N is the start offset protect printed (--sealed refuses to run without it)
+../.venv/bin/python -m stego_core.cli tamper --stego /tmp/sealed.png --attack corrupt_payload \
+    --sealed --start N --lsb 2 --out /tmp/sealed-corrupt.png
+../.venv/bin/python -m stego_core.cli verify --stego /tmp/sealed-corrupt.png \
+    --pub /tmp/sealed-demo-keys/public/sealed-demo_ed25519.pub.pem --lsb 2 --media-id sealed-demo \
+    --passphrase "demo passphrase" --start N           # Tampered, "sealed": true
+# For the 3-copy variant add --copies 3 to protect, tamper and every verify. The right passphrase
+# still gives Authentic before the attack and Tampered after it.
 ```
+
+`keygen` refuses to overwrite an existing key file unless given `--force`, so running the block a
+second time needs a fresh `--out` folder (or `rm -r /tmp/sealed-demo-keys` first).

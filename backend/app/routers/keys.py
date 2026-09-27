@@ -7,7 +7,7 @@ the demo, and mention that these keys exist only for the assignment.
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import FileResponse
@@ -63,31 +63,64 @@ async def inspect(
     return KeyInfo(key_id=fp[:16], label="imported", public_key_pem=public_key_pem, fingerprint=fp)
 
 
+def _is_plain_pem_name(name: str) -> bool:
+    """True if `name` is a bare `.pem` file name: no directory, drive, backslash or NUL.
+
+    Checked on the string alone, before `name` touches the filesystem. A NUL byte
+    makes `resolve()` raise, which is a 500 instead of a 404. On the Windows demo
+    host a backslash or a drive (`C:x.pem`) would point outside keys/public/, so
+    both are refused whatever the host OS is.
+    """
+    return (
+        name.endswith(".pem")
+        and "\x00" not in name
+        and PurePosixPath(name).name == name
+        and PureWindowsPath(name).name == name
+    )
+
+
+def _committed_public_key(name: str) -> tuple[Path, PublicKeyFile] | None:
+    """`keys/public/<name>` and its listing entry, or None if it must be neither listed nor served.
+
+    The listing and the download both go through here, so they agree. The file
+    must resolve to a file directly inside keys/public/ (a symlink cannot lead
+    out), hold a usable Ed25519 public key (an unparseable or unsupported key is
+    skipped, not a 500 for the whole list), and contain no private key block:
+    `cryptography` reads only the first PEM block, so a public-then-private bundle
+    parses as a public key and would otherwise be published whole.
+    """
+    if not _is_plain_pem_name(name):
+        return None
+    path = (PUBLIC_KEYS_DIR / name).resolve()
+    if path.parent != PUBLIC_KEYS_DIR.resolve():
+        return None
+    try:
+        pem = path.read_bytes()
+        fp = signing.fingerprint(pem)
+        text = pem.decode()
+    except (OSError, KeyError_, UnicodeDecodeError):
+        return None
+    if "PRIVATE KEY" in text:
+        return None
+    return path, PublicKeyFile(name=name, fingerprint=fp, public_key_pem=text, url=f"/api/keys/public/{name}")
+
+
 @router.get("/keys/public", response_model=list[PublicKeyFile])
 async def public_keys() -> list[PublicKeyFile]:
     """The team's committed public keys, so the Verify tab can pick one without
     a file dialog. Only `keys/public/*.pem` is read; `keys/private/` never is."""
     keys = []
     for path in sorted(PUBLIC_KEYS_DIR.glob("*.pem")):
-        pem = path.read_bytes()
-        try:
-            fp = signing.fingerprint(pem)
-        except (KeyError_, ValueError):
-            continue
-        keys.append(
-            PublicKeyFile(
-                name=path.name,
-                fingerprint=fp,
-                public_key_pem=pem.decode(),
-                url=f"/api/keys/public/{path.name}",
-            )
-        )
+        found = _committed_public_key(path.name)
+        if found is not None:
+            keys.append(found[1])
     return keys
 
 
 @router.get("/keys/public/{name}")
 async def public_key_file(name: str) -> FileResponse:
-    path = (PUBLIC_KEYS_DIR / Path(name).name).resolve()
-    if path.parent != PUBLIC_KEYS_DIR.resolve() or path.suffix != ".pem" or not path.is_file():
+    """Download one committed public key: exactly the files the listing shows."""
+    found = _committed_public_key(name)
+    if found is None:
         raise HTTPException(status_code=404, detail="public key not found")
-    return FileResponse(path, media_type="application/x-pem-file", filename=path.name)
+    return FileResponse(found[0], media_type="application/x-pem-file", filename=name)

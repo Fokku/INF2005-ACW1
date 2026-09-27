@@ -4,7 +4,7 @@ Work is grouped into **9 workstreams** (plus K, demo readiness). Each one is a s
 with its own files and an `Owner` line.
 
 **Status (2026-09-27):** every implementation stub is done (`grep -rn "TODO(team)" backend frontend
-scripts` finds nothing), 806 backend tests pass, and a Playwright run asserts 38 GUI scenes. What is
+scripts` finds nothing), 938 backend tests pass, and a Playwright run asserts 38 GUI scenes. What is
 still open is team-only: the live email transfer screenshots, signatures, agreed percentages,
 AI-use confirmations and rehearsals — see the unticked boxes in G, H and I.
 
@@ -95,7 +95,8 @@ Do this after A–D. It is mostly plumbing.
 - [x] `capacity`, `protect`, `verify`, `keys` routers wired to the real pipeline/`signing` functions
 - [x] `attack` router / `attacks.py` — Kannon, see workstream F
 - [x] `stego` CLI commands: `keygen`, `capacity`, `protect`, `verify`, `tamper`
-      (`stego_core/cli.py`; `tests/test_cli.py` — 7/7 green, exercises real PNG/WAV covers)
+      (`stego_core/cli.py`; `tests/test_cli.py` — 16/16 green, exercises real PNG/WAV covers;
+      `keygen` refuses to overwrite an existing key file without `--force`)
 - [x] Make `tests/test_api.py::test_protect_then_verify_roundtrip` pass for image and audio
 
 Full backend suite is 629/629 green after FR11 evidence (`cd backend && python -m pytest -q`).
@@ -201,7 +202,8 @@ object. `scripts/make_samples.py` now produces all 7 (plus `Cannot Verify`, prov
       byte-identical — see the script's docstring)
 - [x] README's "Expected outputs" table — every sample file, its settings, and its verdict
 - [x] Screenshots of each verdict — Kai Yuan: `scripts/capture_screenshots.py` drives the real GUI
-      (Playwright) through all six verdicts for image and audio plus the capacity, transfer, attack,
+      (Playwright) through all six verdicts for image and five for audio (Cannot Verify is
+      image-only: there is no audio Cannot Verify sample) plus the capacity, transfer, attack,
       robust, sealed, steganalysis and video flows, asserting each one — 38/38 in
       `evidence/screenshots/gui/` (index: its `README.md`)
 - [x] The party A → party B run, recorded — Kai Yuan: `scripts/transfer_demo.py` sends a real
@@ -284,8 +286,12 @@ after A–H are green. Pick one or two and go deep rather than spreading thin ac
       (3x frame size at redundancy=3). In the GUI: a "Copies embedded" selector (1/3/5) on Protect
       and Verify, the capacity meter counts every copy, and the Attack Lab's `lsb_noise` attack
       flips 0.1% of the hidden low bits. Demo: 1 copy + `lsb_noise` gives Tampered, 3 or 5 copies
-      + `lsb_noise` still gives Authentic (`tests/test_robust_embedding_api.py`). Honest limit:
-      JPEG re-encoding or audio resampling defeats every copy, since they rewrite all low bits.
+      + `lsb_noise` still gives Authentic (`tests/test_robust_embedding_api.py`). `corrupt_payload`
+      and `replay` are told the copy count (`redundancy` on `POST /api/attack`, `--copies` on
+      `stego tamper`, the Attack Lab's Copies field) and change or carry every copy, so they still
+      give Tampered on a 3- or 5-copy file, sealed or not (`tests/test_attack_redundancy.py`).
+      Honest limit: JPEG re-encoding or audio resampling defeats every copy, since they rewrite all
+      low bits.
 - [x] **Attack simulation module** — covered by workstream F (Kannon): tampering, payload
       corruption, LSB scrub, re-encode, crop and replay/substitution in `attacks.py`, with wrong key
       and wrong start location shown through Verify. Overlaps workstream F. Extend `attacks.py` beyond the six
@@ -325,8 +331,10 @@ covered by the Playwright run:
       `scripts/make_video_cover.py`
 - [x] `POST /api/keys/inspect` took a query parameter while the UI sent a form (422) — fixed; the
       Keys tab now checks fingerprints and lists the committed public keys
-- [x] Capacity meter's "largest message" disagreed with `fits` by up to 2 bytes — fixed with a
-      boundary test
+- [x] Capacity meter could say a message fits when Protect then refused it: `/api/capacity` now
+      measures the signed JSON (real media ID and metadata), encryption, every copy and the start
+      offset the way Protect pays them, so its largest message protects and one byte more does not
+      (`tests/test_capacity_accuracy.py`)
 - [x] Steganalysis (Ke Ying's method) exposed as `POST /api/steganalysis` and a fifth GUI tab with
       a per-window evidence chart
 - [x] Demo speed: one-click **Load a demo sample** on Verify (settings from the sample manifest,

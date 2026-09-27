@@ -35,6 +35,12 @@ interface TargetContext {
   source: string
   mediaId: string
   redundancy: number
+  /** The target's frame is sealed: Verify cannot even find it without the passphrase. */
+  sealed?: boolean
+  /** The hidden message is encrypted: Verify needs the passphrase to show it (not for the verdict). */
+  messageEncrypted?: boolean
+  /** Only for demo samples, whose passphrase is published with them; Protect's never travels. */
+  passphrase?: string | null
   publicKeyPem?: string | null
   publicKeyLabel?: string | null
 }
@@ -56,9 +62,15 @@ export function AttackLabPage({
   const [otherCover, setOtherCover] = useState<File | null>(null)
   const [nLsb, setNLsb] = useState(1)
   const [startOffset, setStartOffset] = useState(0)
+  const [redundancy, setRedundancy] = useState(1)
   const [sealed, setSealed] = useState(false)
   const [selected, setSelected] = useState<AttackKind | null>(null)
   const [result, setResult] = useState<AttackResult | null>(null)
+  // The settings the current result was produced with (the form may change
+  // afterwards): the prediction and the Verify hand-off must describe this file.
+  const [ran, setRan] = useState<{ nLsb: number; startOffset: number; redundancy: number; sealed: boolean } | null>(
+    null,
+  )
   const [error, setError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
 
@@ -68,11 +80,12 @@ export function AttackLabPage({
     api.publicKeys().then(setPublicKeys).catch(() => setPublicKeys([]))
   }, [])
 
-  function applyTarget(file: File, lsb: number, offset: number, ctx: TargetContext | null, isSealed = false) {
+  function applyTarget(file: File, lsb: number, offset: number, ctx: TargetContext) {
     setStego(file)
     setNLsb(lsb)
     setStartOffset(offset)
-    setSealed(isSealed)
+    setRedundancy(ctx.redundancy)
+    setSealed(Boolean(ctx.sealed))
     setContext(ctx)
     setSelected(null)
     setResult(null)
@@ -88,9 +101,11 @@ export function AttackLabPage({
       source: prefill.source,
       mediaId: prefill.mediaId,
       redundancy: prefill.redundancy,
+      sealed: prefill.sealed,
+      messageEncrypted: prefill.messageEncrypted,
       publicKeyPem: prefill.publicKeyPem,
       publicKeyLabel: prefill.publicKeyLabel,
-    }, prefill.sealed)
+    })
   }
 
   async function takeProtected() {
@@ -102,9 +117,11 @@ export function AttackLabPage({
         source: 'Protect tab',
         mediaId: handoff.mediaId,
         redundancy: r.redundancy,
+        sealed: r.sealed,
+        messageEncrypted: r.payload.message_encrypted,
         publicKeyPem: r.signer_public_key_pem,
         publicKeyLabel: `signer key ${r.signer_fingerprint.slice(0, 12)}…`,
-      }, r.sealed)
+      })
     } catch (err) {
       setError(err)
     }
@@ -123,6 +140,7 @@ export function AttackLabPage({
         source: `Sample · ${sample.file}`,
         mediaId: sample.media_id,
         redundancy: sample.redundancy,
+        passphrase: sample.passphrase,
         publicKeyPem: key?.public_key_pem,
         publicKeyLabel: key ? `keys/public/${key.name}` : null,
       })
@@ -137,6 +155,7 @@ export function AttackLabPage({
     setBusy(true)
     setError(null)
     setResult(null)
+    setRan({ nLsb, startOffset, redundancy, sealed })
     try {
       setResult(
         await api.runAttack({
@@ -146,6 +165,9 @@ export function AttackLabPage({
           startOffset,
           otherCover: otherCover ?? undefined,
           sealed,
+          // corrupt_payload and replay must reach every copy: damaging one of
+          // three is outvoted, and replay has to move all of them.
+          redundancy,
         }),
       )
     } catch (err) {
@@ -156,34 +178,49 @@ export function AttackLabPage({
   }
 
   // The backend's prediction for lsb_noise assumes a single copy; with robust
-  // embedding (3 or 5 copies) the majority vote repairs the damage.
-  const redundancy = context?.redundancy ?? 1
+  // embedding (3 or 5 copies) the majority vote repairs the damage. The other
+  // attacks are told the copy count, so their predictions already hold.
+  const ranCopies = ran?.redundancy ?? 1
   const predicted: Verdict | null = result
-    ? result.attack === 'lsb_noise' && redundancy > 1
+    ? result.attack === 'lsb_noise' && ranCopies > 1
       ? 'Authentic'
       : result.expected_verdict
     : null
 
   async function verifyResult() {
-    if (!result) return
+    if (!result || !ran) return
     try {
       const file = await fetchAsFile(result.output.url, result.output.filename, result.output.mime)
+      const passphrase = context?.passphrase || null
+      // Explicit mode skips the passphrase-derived start, but a sealed frame is
+      // still invisible without the passphrase: Verify would report Payload
+      // Missing (or Cannot Verify) instead of the predicted verdict.
+      const passphraseNote = passphrase
+        ? null
+        : ran.sealed
+          ? 'Type the shared passphrase: the frame is sealed, and a sealed frame cannot be found without it.'
+          : context?.messageEncrypted
+            ? 'Type the shared passphrase to read the encrypted message (the verdict does not need it).'
+            : null
+      const settingsNote = context
+        ? 'Original media ID, LSB count, copies and start offset carried over. The prediction assumes these settings.'
+        : 'Enter the original media ID and public key before verifying.'
       onVerify({
         source: `Attack Lab · ${result.attack}`,
         file,
         mediaId: context?.mediaId ?? '',
-        nLsb,
-        redundancy: context?.redundancy ?? 1,
+        nLsb: ran.nLsb,
+        redundancy: ran.redundancy,
         // Explicit mode with the original offset: after a crop or replay the
         // cover size changes, and a derived start would move with it.
         startMode: 'explicit',
-        explicitStart: startOffset,
+        explicitStart: ran.startOffset,
+        passphrase,
+        requiresPassphrase: ran.sealed,
         publicKeyPem: context?.publicKeyPem ?? null,
         publicKeyLabel: context?.publicKeyLabel ?? null,
         expectedVerdict: predicted,
-        note: context
-          ? 'Original media ID, LSB count, copies and start offset carried over. The prediction assumes these settings.'
-          : 'Enter the original media ID and public key before verifying.',
+        note: passphraseNote ? `${passphraseNote} ${settingsNote}` : settingsNote,
       })
     } catch (err) {
       setError(err)
@@ -244,7 +281,7 @@ export function AttackLabPage({
               setResult(null)
             }}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Field label="LSBs used">
               <input
                 type="number"
@@ -264,6 +301,20 @@ export function AttackLabPage({
                 onChange={(e) => setStartOffset(Number(e.target.value))}
               />
             </Field>
+            <Field label="Copies">
+              <select
+                aria-label="Copies embedded"
+                className="select select-sm font-exhibit w-full"
+                value={redundancy}
+                onChange={(e) => setRedundancy(Number(e.target.value))}
+              >
+                {[1, 3, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input
@@ -275,10 +326,11 @@ export function AttackLabPage({
             <span>Target has a sealed frame</span>
           </label>
           <p className="text-xs text-base-content/70">
-            Both come from the Protect report (filled in automatically when the target comes from
+            All three come from the Protect report (filled in automatically when the target comes from
             Protect or a sample). Verification of the damaged file uses the original media ID, public
             key and this offset in explicit start mode. A sealed frame's header is encrypted, so
-            corrupt_payload and replay then work blind from the offset instead of reading the header.
+            corrupt_payload and replay then work blind from the offset instead of reading the header,
+            and Verify needs the shared passphrase to find the frame at all.
           </p>
           <FilePicker
             label="Second cover (replay attack only)"
@@ -327,8 +379,8 @@ export function AttackLabPage({
                 <p className="font-medium">Damaged copy created: {result.attack}</p>
                 <p className="flex flex-wrap items-center gap-2 text-base-content/70">
                   Predicted verdict: <VerdictChip verdict={predicted ?? result.expected_verdict} />
-                  {result.attack === 'lsb_noise' && redundancy > 1 && (
-                    <span className="text-xs">({redundancy} copies embedded: the majority vote repairs the noise)</span>
+                  {result.attack === 'lsb_noise' && ranCopies > 1 && (
+                    <span className="text-xs">({ranCopies} copies embedded: the majority vote repairs the noise)</span>
                   )}
                 </p>
                 <p className="text-base-content/70">{result.description}</p>

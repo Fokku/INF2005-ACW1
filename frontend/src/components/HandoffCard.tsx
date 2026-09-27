@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
+import { useObjectUrl } from '../lib/useObjectUrl'
 import type { ProtectResult, StartMode } from '../types'
 import { Exhibit } from './Exhibit'
 
@@ -27,11 +28,13 @@ export function HandoffCard({
   onAttack: () => void
   busy: boolean
 }) {
-  const publicKeyUrl = useMemo(
-    () => URL.createObjectURL(new Blob([result.signer_public_key_pem], { type: 'application/x-pem-file' })),
+  // The Blob is memoized; its URL lives in useObjectUrl's effect so StrictMode
+  // (pnpm dev) cannot leave the download link pointing at a revoked URL.
+  const publicKeyBlob = useMemo(
+    () => new Blob([result.signer_public_key_pem], { type: 'application/x-pem-file' }),
     [result.signer_public_key_pem],
   )
-  useEffect(() => () => URL.revokeObjectURL(publicKeyUrl), [publicKeyUrl])
+  const publicKeyUrl = useObjectUrl(publicKeyBlob)
 
   return (
     <div className="border-base-300 space-y-4 rounded-sm border p-4">
@@ -66,7 +69,7 @@ export function HandoffCard({
         <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={onAttack}>
           Attack this file →
         </button>
-        <a href={publicKeyUrl} download="signer.pub.pem" className="btn btn-outline btn-sm">
+        <a href={publicKeyUrl ?? undefined} download="signer.pub.pem" className="btn btn-outline btn-sm">
           Download public key
         </a>
       </div>

@@ -7,14 +7,14 @@ list the Verify tab can load directly — file, media ID, LSB count, start mode,
 passphrase and public key — so a presenter never has to type settings on stage
 (docs/demo-plan.md, "Contingencies": switch to the pre-generated file).
 
-Only files inside `samples/` and `keys/public/` are ever served. Private keys
-are never listed or served.
+Only files a listed case names, inside `samples/`, and the public keys in
+`keys/public/` are ever served. Private keys are never listed or served.
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -29,7 +29,11 @@ SAMPLES_DIR = ROOT / "samples"
 MANIFEST = ROOT / "evidence" / "logs" / "sample-manifest.json"
 TEAM_PUBLIC_KEY = "team_ed25519.pub.pem"
 # Any real Ed25519 key other than the signer's demonstrates Signature Invalid.
-# The Section F demo key is committed and was never used to sign samples/.
+# The Section F demo key is committed and did not sign the short-message samples
+# these cases pair it with (the team key did). It did sign a file in samples/:
+# samples/audio/stego/section-f-replay-source.wav, whose signed frame
+# samples/audio/tampered/section-f-replay.wav replays (evidence/section-f.md).
+# Neither is a sample case.
 MISMATCHED_PUBLIC_KEY = "section-f-demo.pub.pem"
 _SERVABLE = {".png", ".wav", ".avi"}
 
@@ -111,8 +115,9 @@ def _case_from_manifest(entry: dict, stego_by_kind: dict[str, str]) -> SampleCas
     )
 
 
-def list_cases() -> list[SampleCase]:
-    """Every verifiable case in the manifest, plus the README's Cannot Verify case."""
+def _all_cases() -> list[SampleCase]:
+    """Every verifiable case in the manifest, plus the README's Cannot Verify case,
+    whether or not its file has been generated yet."""
     if not MANIFEST.is_file():
         return []
     entries = json.loads(MANIFEST.read_text(encoding="utf-8")).get("cases", [])
@@ -144,7 +149,29 @@ def list_cases() -> list[SampleCase]:
                 note="The bounded magic scan stops before covering the whole file, so absence cannot be proven.",
             )
         )
-    return [c for c in cases if (ROOT / c.file).is_file()]
+    return cases
+
+
+def list_cases() -> list[SampleCase]:
+    """The cases whose file exists, i.e. the ones the Verify tab can load."""
+    return [c for c in _all_cases() if (ROOT / c.file).is_file()]
+
+
+def _is_plain_relative_path(path: str) -> bool:
+    """True if `path` is a forward-slash relative path with no `..` step.
+
+    Checked on the string alone, before `path` touches the filesystem. A NUL byte
+    makes `resolve()` raise, which is a 500 instead of a 404. Worse, on the
+    Windows demo host an absolute path joined onto SAMPLES_DIR replaces it, and
+    `//host/share/x.png` (or `\\\\host\\share\\x.png`) names a network share:
+    `resolve()` would open it over SMB, offering the presenter's NTLM credentials,
+    before any containment check could refuse it. So NUL, backslashes, root,
+    drive and UNC anchors and `..` are refused whatever the host OS is.
+    """
+    if not path or "\x00" in path or "\\" in path:
+        return False
+    posix = PurePosixPath(path)
+    return not posix.is_absolute() and not PureWindowsPath(path).anchor and ".." not in posix.parts
 
 
 @router.get("/samples", response_model=list[SampleCase])
@@ -154,6 +181,13 @@ async def samples() -> list[SampleCase]:
 
 @router.get("/samples/file/{path:path}")
 async def sample_file(path: str) -> FileResponse:
+    """One case's file. Only a path some case in the manifest names is served
+    (the GUI only ever requests `SampleCase.url`), and it is checked as a string
+    before anything touches the filesystem. The resolved target must still lie
+    inside samples/ and be PNG, WAV or AVI, so a symlink cannot lead out either."""
+    listed = {case.file.removeprefix("samples/") for case in _all_cases()}
+    if not _is_plain_relative_path(path) or path not in listed:
+        raise HTTPException(status_code=404, detail="not a sample file")
     target = (SAMPLES_DIR / path).resolve()
     if not target.is_relative_to(SAMPLES_DIR.resolve()) or target.suffix.lower() not in _SERVABLE:
         raise HTTPException(status_code=404, detail="not a sample file")

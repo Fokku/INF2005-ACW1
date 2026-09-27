@@ -80,7 +80,10 @@ export interface CapacityReport {
   total_elements: number
   capacity_bits: number
   capacity_bytes: number
+  /** Everything one copy loses besides the message, start_reserve_bytes included. */
   frame_overhead_bytes: number
+  /** The part of frame_overhead_bytes skipped before the start offset (worst case when derived). */
+  start_reserve_bytes: number
   max_message_bytes: number
   payload_bytes?: number | null
   fits?: boolean | null
@@ -267,6 +270,13 @@ export interface VerifyPrefill {
   expectedSha256?: string | null
   expectedVerdict?: Verdict | null
   note?: string | null
+  /**
+   * The file cannot be checked without the shared passphrase, even in explicit
+   * start mode: its frame is sealed, and a sealed frame is invisible without
+   * the key derived from it. Verify then blocks until a passphrase is typed,
+   * and keeps one already typed when the prefill carries none.
+   */
+  requiresPassphrase?: boolean
 }
 
 /** What the Protect tab produced last, shared with Verify and the Attack Lab. */
@@ -287,6 +297,8 @@ export interface AttackPrefill {
   redundancy: number
   /** The target holds a sealed frame (the Attack Lab then uses key-less variants). */
   sealed?: boolean
+  /** The hidden message was encrypted (Verify needs the passphrase to show it). */
+  messageEncrypted?: boolean
   publicKeyPem?: string | null
   publicKeyLabel?: string | null
 }

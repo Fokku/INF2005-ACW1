@@ -8,19 +8,31 @@ Two jobs:
 The argument parsing below is COMPLETE. Each command's body calls into
 `pipeline` / `signing`, which are the TODO parts.
 
-    stego keygen   --out keys
+    stego keygen   --out keys --label NAME [--force]
     stego capacity --cover FILE --lsb N
     stego protect  --cover FILE --message FILE --lsb N --media-id ID \
                    --key keys/private/team_ed25519.pem --passphrase SECRET --out FILE \
-                   [--seal]
+                   [--seal] [--copies N]
     stego verify   --stego FILE --pub keys/public/team_ed25519.pub.pem \
-                   --lsb N --media-id ID --passphrase SECRET
-    stego tamper   --stego FILE --attack flip_bits --out FILE [--sealed]
+                   --lsb N --media-id ID --passphrase SECRET [--copies N]
+    stego tamper   --stego FILE --attack flip_bits --out FILE \
+                   [--sealed --start OFFSET] [--copies N]
+    stego serve    [--port 8000] [--reload]
+
+`keygen` refuses to overwrite an existing key file unless given `--force`.
+keys/public/team_ed25519.pub.pem is committed and the demo samples verify
+against it, so a teammate generating a personal pair should pick their own
+`--label`.
 
 `--seal` encrypts the whole embedded frame (stego_core/sealing.py). verify
 needs no flag for it: it opens a sealed frame automatically when the
-passphrase is right, and reports "sealed" in its JSON output.
-    stego serve    [--port 8000] [--reload]
+passphrase is right, and reports "sealed" in its JSON output. The key-less
+`tamper --sealed` variants cannot find or check a sealed frame, so they need
+the real `--start` that protect printed.
+
+`--copies N` is robust embedding (stego_core/ecc.py): N copies of the frame,
+majority-voted on read. verify and the frame-reading tamper attacks
+(corrupt_payload, replay) must be given the same N that protect used.
 """
 
 from __future__ import annotations
@@ -31,7 +43,7 @@ import stat
 import sys
 from pathlib import Path
 
-from . import attacks, audio_codec, container, image_codec, lsb, pipeline, signing, video_codec
+from . import attacks, audio_codec, container, ecc, image_codec, lsb, pipeline, signing, video_codec
 from .errors import StegoError, UnsupportedCoverError
 from .verdict import Verdict
 
@@ -56,15 +68,28 @@ def _sniff_kind(path: Path) -> str:
 
 
 def _cmd_keygen(args: argparse.Namespace) -> int:
-    private_pem, public_pem = signing.generate_keypair()
     out = Path(args.out)
     private_dir = out / "private"
     public_dir = out / "public"
-    private_dir.mkdir(parents=True, exist_ok=True)
-    public_dir.mkdir(parents=True, exist_ok=True)
-
     private_path = private_dir / f"{args.label}_ed25519.pem"
     public_path = public_dir / f"{args.label}_ed25519.pub.pem"
+
+    # Check both files before writing either, so a refusal leaves no half-new
+    # pair behind. The default label is "team", and the committed
+    # keys/public/team_ed25519.pub.pem is the key the demo samples verify
+    # against (app/routers/samples.py): silently replacing it turns every
+    # Authentic sample into Signature Invalid.
+    existing = [str(path) for path in (private_path, public_path) if path.exists()]
+    if existing and not args.force:
+        raise FileExistsError(
+            f"refusing to overwrite existing key file(s): {', '.join(existing)}. Pick a new name with "
+            "--label (a personal pair: --label <yourname>), or pass --force to replace them; "
+            "anything signed for the old public key will then stop verifying."
+        )
+
+    private_pem, public_pem = signing.generate_keypair()
+    private_dir.mkdir(parents=True, exist_ok=True)
+    public_dir.mkdir(parents=True, exist_ok=True)
     private_path.write_bytes(private_pem)
     private_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600: demo-only, never commit
     public_path.write_bytes(public_pem)
@@ -117,6 +142,7 @@ def _cmd_protect(args: argparse.Namespace) -> int:
         passphrase=args.passphrase,
         explicit_start=args.start,
         encrypt_message=args.encrypt,
+        redundancy=args.copies,
         seal_frame=args.seal,
     )
     outcome = pipeline.protect(opts)
@@ -125,6 +151,7 @@ def _cmd_protect(args: argparse.Namespace) -> int:
     print(f"wrote: {args.out}")
     print(f"start offset: {outcome.start_offset}")
     print(f"frame bytes:  {outcome.frame_bytes} (capacity: {outcome.capacity_bytes} bytes)")
+    print(f"copies:       {outcome.redundancy}")
     print(f"sealed:       {'yes' if outcome.sealed else 'no'}")
     print(json.dumps(outcome.payload_json, indent=2))
     return 0
@@ -141,6 +168,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         media_id=args.media_id,
         passphrase=args.passphrase,
         explicit_start=args.start,
+        redundancy=args.copies,
     )
     outcome = pipeline.verify(opts)
     report = {
@@ -162,6 +190,18 @@ def _cmd_tamper(args: argparse.Namespace) -> int:
     kind = _sniff_kind(stego_path)
     data = stego_path.read_bytes()
 
+    frame_attack = args.attack in ("corrupt_payload", "replay")
+    if frame_attack and args.sealed and args.start is None:
+        # Without --sealed a wrong start fails loudly (no plaintext frame
+        # there). The key-less sealed variants cannot tell a sealed frame
+        # from an empty cover, so a guessed start would "succeed" on bits
+        # that hold no frame and write a file that still verifies Authentic.
+        raise StegoError(
+            f"--attack {args.attack} --sealed requires --start: without the passphrase it cannot "
+            "find or check the sealed frame, so give the start offset protect printed"
+        )
+    start = 0 if args.start is None else args.start
+
     if args.attack == "flip_bits":
         output = attacks.flip_bits(data, kind)
     elif args.attack == "crop":
@@ -171,7 +211,9 @@ def _cmd_tamper(args: argparse.Namespace) -> int:
     elif args.attack == "reencode":
         output = attacks.reencode(data, kind)
     elif args.attack == "corrupt_payload":
-        output = attacks.corrupt_payload(data, kind, args.lsb, args.start, sealed=args.sealed)
+        output = attacks.corrupt_payload(
+            data, kind, args.lsb, start, sealed=args.sealed, redundancy=args.copies
+        )
     else:
         if not args.other_cover:
             raise StegoError("--attack replay requires --other-cover")
@@ -179,7 +221,13 @@ def _cmd_tamper(args: argparse.Namespace) -> int:
         if other_kind != kind:
             raise StegoError("replay target must have the same cover kind")
         output = attacks.replay(
-            data, Path(args.other_cover).read_bytes(), kind, args.lsb, args.start, sealed=args.sealed
+            data,
+            Path(args.other_cover).read_bytes(),
+            kind,
+            args.lsb,
+            start,
+            sealed=args.sealed,
+            redundancy=args.copies,
         )
 
     Path(args.out).write_bytes(output)
@@ -203,13 +251,29 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _add_copies_argument(parser: argparse.ArgumentParser, help_text: str) -> None:
+    parser.add_argument(
+        "--copies",
+        type=int,
+        default=1,
+        choices=range(ecc.MIN_REDUNDANCY, ecc.MAX_REDUNDANCY + 1, 2),
+        metavar="N",
+        help=f"{help_text} (odd, {ecc.MIN_REDUNDANCY}-{ecc.MAX_REDUNDANCY}; default 1)",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="stego", description="ACW1 steganography tool")
     sub = p.add_subparsers(dest="command", required=True)
 
     k = sub.add_parser("keygen", help="generate a demo Ed25519 key pair")
     k.add_argument("--out", default="keys", help="directory holding public/ and private/")
-    k.add_argument("--label", default="team", help="key file base name")
+    k.add_argument(
+        "--label",
+        default="team",
+        help="key file base name; the committed team public key uses 'team', so pick your own",
+    )
+    k.add_argument("--force", action="store_true", help="overwrite an existing key pair with this label")
     k.set_defaults(func=_cmd_keygen)
 
     c = sub.add_parser("capacity", help="how much can this cover hold?")
@@ -232,6 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="AES-256-CTR the whole frame so no plaintext magic/header is embedded (needs --passphrase)",
     )
+    _add_copies_argument(pr, "copies of the frame to embed (robust embedding); verify needs the same N")
     pr.add_argument("--out", required=True)
     pr.set_defaults(func=_cmd_protect)
 
@@ -242,6 +307,7 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--media-id", required=True)
     v.add_argument("--passphrase")
     v.add_argument("--start", type=int)
+    _add_copies_argument(v, "copies of the frame that protect embedded")
     v.set_defaults(func=_cmd_verify)
 
     t = sub.add_parser("tamper", help="produce a negative test case")
@@ -252,12 +318,19 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["flip_bits", "crop", "lsb_scrub", "reencode", "corrupt_payload", "replay"],
     )
     t.add_argument("--lsb", type=int, default=1, choices=range(1, 9))
-    t.add_argument("--start", type=int, default=0)
+    t.add_argument(
+        "--start",
+        type=int,
+        help="start offset of the frame (default 0); required with --sealed for corrupt_payload/replay",
+    )
     t.add_argument("--other-cover", help="for --attack replay")
     t.add_argument(
         "--sealed",
         action="store_true",
-        help="corrupt_payload/replay on a sealed frame, without the passphrase",
+        help="corrupt_payload/replay on a sealed frame, without the passphrase (needs --start)",
+    )
+    _add_copies_argument(
+        t, "copies of the frame the target was protected with; corrupt_payload/replay change or carry all"
     )
     t.add_argument("--out", required=True)
     t.set_defaults(func=_cmd_tamper)
@@ -282,7 +355,7 @@ def main(argv: list[str] | None = None) -> int:
     except StegoError as exc:
         print(f"{exc.code}: {exc}", file=sys.stderr)
         return 2
-    except (FileNotFoundError, ValueError) as exc:
+    except (FileNotFoundError, FileExistsError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

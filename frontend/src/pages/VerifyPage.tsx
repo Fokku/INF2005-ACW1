@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, fetchAsFile } from '../api/client'
 import { Exhibit } from '../components/Exhibit'
 import { Field } from '../components/Field'
@@ -12,6 +12,7 @@ import { StartLocationPanel } from '../components/StartLocationPanel'
 import { StepSection } from '../components/StepSection'
 import { VerdictBadge, VerdictChip } from '../components/VerdictBadge'
 import { useAviAudioTrack } from '../lib/useAviAudioTrack'
+import { useObjectUrl } from '../lib/useObjectUrl'
 import type { PublicKeyFile, SampleCase, StartMode, Verdict, VerifyPrefill, VerifyReport } from '../types'
 
 /**
@@ -47,6 +48,7 @@ const HINTS: Partial<Record<Verdict, string[]>> = {
   'Cannot Verify': [
     'Check the LSB count, the passphrase or explicit offset, and the media ID.',
     'Large covers are only scanned up to a limit, so absence cannot always be proven.',
+    'A sealed frame with a wrong passphrase or media ID cannot be found at all: on a large cover that ends here rather than at Payload Missing.',
   ],
 }
 
@@ -65,6 +67,9 @@ export function VerifyPage({ prefill }: { prefill: VerifyPrefill | null }) {
   const [passphrase, setPassphrase] = useState('')
   const [explicitStart, setExplicitStart] = useState(1024)
   const [redundancy, setRedundancy] = useState(1)
+  // Set by a hand-off whose file has a sealed frame: without the passphrase
+  // the frame cannot even be found, so explicit mode needs one too.
+  const [requiresPassphrase, setRequiresPassphrase] = useState(false)
   const [source, setSource] = useState<{ label: string; expected?: Verdict | null; note?: string | null } | null>(
     null,
   )
@@ -92,7 +97,11 @@ export function VerifyPage({ prefill }: { prefill: VerifyPrefill | null }) {
     setRedundancy(prefill.redundancy)
     setStartMode(prefill.startMode)
     if (prefill.explicitStart !== null && prefill.explicitStart !== undefined) setExplicitStart(prefill.explicitStart)
-    setPassphrase(prefill.passphrase ?? '')
+    // The passphrase never travels with a file. When this one needs it, keep a
+    // passphrase party B already typed instead of wiping it; otherwise start
+    // clean so a stale one cannot leak into an unrelated check.
+    if (prefill.passphrase || !prefill.requiresPassphrase) setPassphrase(prefill.passphrase ?? '')
+    setRequiresPassphrase(Boolean(prefill.requiresPassphrase))
     if (prefill.publicKeyPem) {
       setPublicKeyFile(null)
       setPublicKeyText(prefill.publicKeyPem)
@@ -124,10 +133,7 @@ export function VerifyPage({ prefill }: { prefill: VerifyPrefill | null }) {
     }
   }, [publicKeyFile, publicKeyText])
 
-  const stegoUrl = useMemo(() => (stego ? URL.createObjectURL(stego) : null), [stego])
-  useEffect(() => () => {
-    if (stegoUrl) URL.revokeObjectURL(stegoUrl)
-  }, [stegoUrl])
+  const stegoUrl = useObjectUrl(stego)
   const isAudio = stego?.name.toLowerCase().endsWith('.wav') ?? false
   const isVideo = stego?.name.toLowerCase().endsWith('.avi') ?? false
 
@@ -143,13 +149,16 @@ export function VerifyPage({ prefill }: { prefill: VerifyPrefill | null }) {
         ? 'Choose or paste the sender’s public key.'
         : startMode === 'derived' && !passphrase
           ? 'Enter the shared passphrase: the derived start location needs it.'
-          : null
+          : requiresPassphrase && !passphrase
+            ? 'Enter the shared passphrase: this file’s frame is sealed, and a sealed frame cannot be found without it.'
+            : null
 
   function chooseFile(next: File | null) {
     setStego(next)
     setReport(null)
     setError(null)
     setSource(null)
+    setRequiresPassphrase(false)
     if (next && (mediaIdAuto || !mediaId)) {
       setMediaId(guessMediaId(next.name))
       setMediaIdAuto(true)
@@ -178,6 +187,7 @@ export function VerifyPage({ prefill }: { prefill: VerifyPrefill | null }) {
       setStartMode(sample.start_mode)
       if (sample.explicit_start !== null) setExplicitStart(sample.explicit_start)
       setPassphrase(sample.passphrase ?? '')
+      setRequiresPassphrase(false)
       selectPublicKey(sample.public_key)
       setExpectedSha('')
       setSource({ label: `Sample · ${sample.file}`, expected: sample.expected_verdict, note: sample.note })

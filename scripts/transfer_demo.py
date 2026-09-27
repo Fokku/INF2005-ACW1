@@ -38,8 +38,12 @@ Run from the repository root:
     PYTHONPATH=backend .venv/bin/python scripts/transfer_demo.py --out evidence/transfer
 
 The exit status is 0 only if every check passes. Re-running replaces the
-generated files under --out. Each payload carries a fresh nonce and timestamp
-by design, so stego bytes and hashes change from run to run, but every check
+generated files under --out, but only once the new run has passed every
+check: keys, covers and message are checked first, and the run is built in a
+hidden folder next to --out and swapped in at the end. A refused or failing
+run leaves --out as it was (a failing run's files go to a temporary folder,
+whose path is printed). Each payload carries a fresh nonce and timestamp by
+design, so stego bytes and hashes change from run to run, but every check
 must pass on every run.
 """
 
@@ -59,8 +63,9 @@ import shutil
 import smtplib
 import socketserver
 import sys
+import tempfile
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from email.message import EmailMessage
 from pathlib import Path
@@ -611,18 +616,68 @@ class TransferResult:
     all_passed: bool
 
 
-def _reset_output(out: Path, private_key: Path) -> None:
-    if out.resolve() in (ROOT, ROOT.parent, Path(out.resolve().anchor)):
+@dataclass(frozen=True)
+class _Inputs:
+    """Everything the run reads, loaded before --out is touched (see run_transfer)."""
+
+    covers: dict[str, Path]
+    cover_bytes: dict[str, bytes]
+    message_path: Path
+    message: bytes
+    private_key: Path
+    public_key: Path
+    private_pem: bytes
+    public_pem: bytes
+    key_generated: bool
+    key_log: tuple[str, ...]  # load_or_create_keys' lines, replayed under "== Keys =="
+
+
+def _read_input(path: Path, what: str) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise SystemExit(f"cannot read the {what} {_display(path, ROOT)}: {exc.strerror or exc}") from exc
+
+
+def _check_output(out: Path, private_key: Path) -> None:
+    """Refuse an output folder the run must never publish into."""
+    resolved = out.resolve()
+    if resolved in (ROOT, ROOT.parent, Path(resolved.anchor)):
         raise SystemExit(f"refusing to use {out} as the output folder")
-    if private_key.resolve().is_relative_to(out.resolve()):
+    if out.exists() and not out.is_dir():
+        raise SystemExit(f"{out} exists and is not a folder")
+    if private_key.resolve().is_relative_to(resolved):
         raise SystemExit("the private key must not live inside the output folder")
-    out.mkdir(parents=True, exist_ok=True)
-    for name in GENERATED:
-        path = out / name
-        if path.is_dir():
-            shutil.rmtree(path)
-        elif path.exists():
-            path.unlink()
+
+
+def _publish(work: Path, out: Path) -> None:
+    """Swap the finished run's GENERATED entries from `work` into `out`.
+
+    `work` is a sibling of `out`, so each step is a rename on one filesystem.
+    The previous entries are moved aside into `work` first; if a rename fails
+    part-way (a file held open on Windows, say) everything is moved back, so
+    `out` ends up either fully old or fully new. Anything else in `out` is
+    left alone, as before.
+    """
+    out.mkdir(exist_ok=True)
+    previous = work / ".previous"
+    previous.mkdir()
+    moved_aside: list[str] = []
+    moved_in: list[str] = []
+    try:
+        for name in GENERATED:
+            if os.path.lexists(out / name):
+                os.replace(out / name, previous / name)
+                moved_aside.append(name)
+        for name in GENERATED:
+            os.replace(work / name, out / name)
+            moved_in.append(name)
+    except BaseException:
+        for name in reversed(moved_in):
+            os.replace(out / name, work / name)
+        for name in reversed(moved_aside):
+            os.replace(previous / name, out / name)
+        raise
 
 
 def run_transfer(
@@ -637,13 +692,70 @@ def run_transfer(
     regenerate_key: bool = False,
     echo: bool = True,
 ) -> TransferResult:
+    """Run the round trip and publish it into `out` only if every check passes.
+
+    `out` is usually the committed evidence/transfer/, so nothing may touch it
+    until the run is known to be good. First everything that can refuse the
+    run is checked: the output folder, the key pair (a clone with the
+    committed public key but no private half stops here), the covers and the
+    message. The run is then built in a hidden folder next to `out` and
+    swapped in by _publish once every check has passed. A refused, crashed or
+    failing run leaves `out` exactly as it was. A failing run's files are
+    moved to a fresh temporary folder instead, and the result's `out` points
+    there so they can be inspected.
+    """
     out = Path(out)
+    private_key, public_key = Path(private_key), Path(public_key)
+    _check_output(out, private_key)
+    covers = {"image": Path(image_cover), "audio": Path(audio_cover)}
+    cover_bytes = {kind: _read_input(path, f"{kind} cover") for kind, path in covers.items()}
+    message = _read_input(Path(message_path), "message file")
+    key_log = Log(echo=False)
+    private_pem, public_pem, key_generated = load_or_create_keys(
+        private_key, public_key, regenerate=regenerate_key, log=key_log
+    )
+    inputs = _Inputs(
+        covers=covers,
+        cover_bytes=cover_bytes,
+        message_path=Path(message_path),
+        message=message,
+        private_key=private_key,
+        public_key=public_key,
+        private_pem=private_pem,
+        public_pem=public_pem,
+        key_generated=key_generated,
+        key_log=tuple(key_log.lines),
+    )
+
+    target = out.resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix=f".{target.name}.", suffix=".partial", dir=target.parent))
+    try:
+        result = _transfer(work, inputs, passphrase=passphrase, echo=echo)
+        if result.all_passed:
+            _publish(work, target)
+            return replace(result, out=out)
+        failed = Path(tempfile.mkdtemp(prefix="transfer-demo-failed-"))
+        for name in GENERATED:
+            if os.path.lexists(work / name):
+                shutil.move(work / name, failed / name)
+        return replace(result, out=failed)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _transfer(work: Path, inputs: _Inputs, *, passphrase: str, echo: bool) -> TransferResult:
+    """The round trip itself, written into the empty folder `work`.
+
+    Every path in the report and the log is relative to `work`, so they stay
+    right once run_transfer swaps the files into --out.
+    """
     log = Log(echo)
     checks = Checks(log)
-    _reset_output(out, Path(private_key))
     generated_at = _now()
-    covers = {"image": Path(image_cover), "audio": Path(audio_cover)}
-    message = Path(message_path).read_bytes()
+    covers, message_path, message = inputs.covers, inputs.message_path, inputs.message
+    private_key, public_key = inputs.private_key, inputs.public_key
+    private_pem, public_pem, key_generated = inputs.private_pem, inputs.public_pem, inputs.key_generated
 
     log("ACW1 party A -> party B transfer (LOCAL SIMULATION)")
     log("In-process SMTP on 127.0.0.1 + Maildir, standard library only; not a third-party mail provider.")
@@ -653,13 +765,12 @@ def run_transfer(
 
     # ---- keys ----------------------------------------------------------------------
     log("== Keys ==")
-    private_pem, public_pem, key_generated = load_or_create_keys(
-        Path(private_key), Path(public_key), regenerate=regenerate_key, log=log
-    )
+    for line in inputs.key_log:
+        log(line)
     fingerprint = signing.fingerprint(public_pem)
-    log(f"public key:   {_display(public_key, out)}")
+    log(f"public key:   {_display(public_key, work)}")
     log(f"fingerprint:  {fingerprint}")
-    log(f"private key:  {_display(private_key, out)} (read locally; never copied into the output)")
+    log(f"private key:  {_display(private_key, work)} (read locally; never copied into the output)")
     probe = b"acw1 transfer key-pair probe"
     checks.expect(
         "the private and public transfer keys form a pair",
@@ -669,13 +780,13 @@ def run_transfer(
 
     # ---- party A: protect ------------------------------------------------------------
     log("== Party A: protect ==")
-    log(f"message: {_display(message_path, out)} ({len(message)} bytes, SHA-256 {sha256(message)})")
+    log(f"message: {_display(message_path, work)} ({len(message)} bytes, SHA-256 {sha256(message)})")
     log(f"settings: n_lsb={N_LSB}, start mode={START_MODE}, message encrypted with AES-256-GCM")
-    outbox = out / "party-a" / "outbox"
+    outbox = work / "party-a" / "outbox"
     outbox.mkdir(parents=True)
     sent_files: list[dict] = []
     for item in ITEMS:
-        cover_bytes = covers[item.kind].read_bytes()
+        cover_bytes = inputs.cover_bytes[item.kind]
         outcome = pipeline.protect(
             pipeline.ProtectOptions(
                 cover_bytes=cover_bytes,
@@ -705,10 +816,10 @@ def run_transfer(
             "subtype": item.subtype,
             "n_lsb": N_LSB,
             "start_mode": START_MODE,
-            "cover": _display(covers[item.kind], out),
+            "cover": _display(covers[item.kind], work),
             "cover_size": len(cover_bytes),
             "cover_sha256": sha256(cover_bytes),
-            "stego": _display(outbox / item.filename, out),
+            "stego": _display(outbox / item.filename, work),
             "size": len(outcome.stego_bytes),
             "sha256": sha256(outcome.stego_bytes),
             "start_offset": outcome.start_offset,
@@ -740,7 +851,7 @@ def run_transfer(
     sent_at = _now()
     mail = compose_email(sent_files, outbox, sent_at)
     raw = mail.as_bytes(policy=email.policy.SMTP)
-    sent_eml = out / "party-a" / "sent.eml"
+    sent_eml = work / "party-a" / "sent.eml"
     sent_eml.write_bytes(raw)
     parts = [
         (part.get_content_type(), part.get_filename(), part["Content-Transfer-Encoding"])
@@ -750,7 +861,7 @@ def run_transfer(
         log(f"{header + ':':12} {mail[header]}")
     for content_type, filename, cte in parts:
         log(f"  part: {content_type:<22} {filename or '-':<28} {cte or '-'}")
-    log(f"raw message: {_display(sent_eml, out)} ({len(raw):,} bytes, SHA-256 {sha256(raw)})")
+    log(f"raw message: {_display(sent_eml, work)} ({len(raw):,} bytes, SHA-256 {sha256(raw)})")
     log("body as party B will read it:")
     for line in mail.get_body(preferencelist=("plain",)).get_content().splitlines():
         log(f"  | {line}")
@@ -764,7 +875,7 @@ def run_transfer(
     log()
 
     # ---- transit ---------------------------------------------------------------------
-    maildir_path = out / "party-b" / "Maildir"
+    maildir_path = work / "party-b" / "Maildir"
     with LocalSMTPReceiver(maildir_path) as receiver:
         log(
             f"== SMTP session with {SMTP_SERVER_NAME} on {receiver.host}:{receiver.port} (receiver's record) =="
@@ -789,7 +900,7 @@ def run_transfer(
     received = email.message_from_bytes(received_raw, policy=email.policy.default)
     delivery = deliveries[0] if deliveries else {}
     if delivery:
-        log(f"stored at: {_display(delivery['path'], out)} ({delivery['stored_bytes']:,} bytes)")
+        log(f"stored at: {_display(delivery['path'], work)} ({delivery['stored_bytes']:,} bytes)")
     log(f"From: {received['From']}  To: {received['To']}")
     log(f"Subject: {received['Subject']}")
     log(f"Received: {' '.join(str(received['Received']).split())}")
@@ -803,7 +914,7 @@ def run_transfer(
     body = received.get_body(preferencelist=("plain",))
     instructions = parse_instructions(body.get_content() if body is not None else "")
 
-    downloads = out / "party-b" / "downloads"
+    downloads = work / "party-b" / "downloads"
     downloads.mkdir(parents=True)
     received_files: dict[str, dict] = {}
     for part in received.iter_attachments():
@@ -816,7 +927,7 @@ def run_transfer(
             "filename": filename,
             "content_type": part.get_content_type(),
             "content_transfer_encoding": part["Content-Transfer-Encoding"],
-            "saved_to": _display(downloads / filename, out),
+            "saved_to": _display(downloads / filename, work),
             "size": len(data),
             "sha256": sha256(data),
             "data": data,
@@ -830,9 +941,9 @@ def run_transfer(
 
     # ---- party B: compare and verify -------------------------------------------------
     log("== Party B: SHA-256 comparison and verification ==")
-    log(f"public key: {_display(public_key, out)} (fingerprint {fingerprint}, confirmed out of band)")
+    log(f"public key: {_display(public_key, work)} (fingerprint {fingerprint}, confirmed out of band)")
     log("passphrase: shared out of band")
-    extracted_dir = out / "party-b" / "extracted"
+    extracted_dir = work / "party-b" / "extracted"
     extracted_dir.mkdir(parents=True)
     party_b_files: list[dict] = []
     for sent in sent_files:
@@ -894,7 +1005,7 @@ def run_transfer(
         if recovered is not None:
             message_file = extracted_dir / f"{Path(sent['filename']).stem.removesuffix('.stego')}.message.txt"
             message_file.write_bytes(recovered)
-            record["extracted_message"] = _display(message_file, out)
+            record["extracted_message"] = _display(message_file, work)
         log(
             f"        verify: {result['verdict']}; signature valid {result['signature_valid']}; "
             f"media hash match {result['hash_match']}; start offset {result['start_offset_used']}"
@@ -923,7 +1034,7 @@ def run_transfer(
 
     # ---- negative controls -----------------------------------------------------------
     log("== Negative controls ==")
-    tampered_dir = out / "party-b" / "tampered"
+    tampered_dir = work / "party-b" / "tampered"
     tampered_dir.mkdir(parents=True)
     controls: list[dict] = []
     for record in party_b_files:
@@ -964,7 +1075,7 @@ def run_transfer(
             {
                 "control": "high_bit_flip_in_transit",
                 "kind": item.kind,
-                "file": _display(altered_path, out),
+                "file": _display(altered_path, work),
                 "change": change,
                 "sha256": altered_sha,
                 "sha256_matches_party_a": altered_sha == record["sha256_party_a"],
@@ -972,7 +1083,7 @@ def run_transfer(
                 **tampered,
             }
         )
-        log(f"[{item.kind}] one high bit flipped ({json.dumps(change)}) -> {_display(altered_path, out)}")
+        log(f"[{item.kind}] one high bit flipped ({json.dumps(change)}) -> {_display(altered_path, work)}")
         log(f"        SHA-256 {altered_sha} (party A sent {record['sha256_party_a']})")
         log(
             f"        verify: {tampered['verdict']}; signature valid {tampered['signature_valid']}; "
@@ -995,13 +1106,13 @@ def run_transfer(
 
     # ---- wrap up ---------------------------------------------------------------------
     log("== Result ==")
-    leaks = private_key_leaks(out, private_pem)
+    leaks = private_key_leaks(work, private_pem)
     checks.expect("no private key material in the output folder", not leaks, ", ".join(leaks))
     passed = sum(item["passed"] for item in checks.items)
     log(f"{'PASS' if checks.all_passed else 'FAIL'}: {passed}/{len(checks.items)} checks passed")
 
     for delivery_record in deliveries:
-        delivery_record["path"] = _display(delivery_record["path"], out)
+        delivery_record["path"] = _display(delivery_record["path"], work)
     report = {
         "title": "ACW1 party A -> party B transfer (local email simulation)",
         "scope": (
@@ -1020,14 +1131,14 @@ def run_transfer(
             "encrypt_message": True,
             "passphrase": f"{passphrase} (demo-only; shared out of band, never in the email)",
             "wrong_passphrase_control": WRONG_PASSPHRASE,
-            "message_file": _display(message_path, out),
+            "message_file": _display(message_path, work),
             "message_bytes": len(message),
             "message_sha256": sha256(message),
         },
         "keys": {
-            "public_key": _display(public_key, out),
+            "public_key": _display(public_key, work),
             "fingerprint": fingerprint,
-            "private_key_location": f"{_display(private_key, out)} (gitignored; never copied into this folder)",
+            "private_key_location": f"{_display(private_key, work)} (gitignored; never copied into this folder)",
             "generated_this_run": key_generated,
         },
         "party_a": {"sent_at": _iso(sent_at), "files": sent_files},
@@ -1037,7 +1148,7 @@ def run_transfer(
             "subject": str(mail["Subject"]),
             "date": str(mail["Date"]),
             "message_id": str(mail["Message-ID"]),
-            "raw_file": _display(sent_eml, out),
+            "raw_file": _display(sent_eml, work),
             "raw_bytes": len(raw),
             "raw_sha256": sha256(raw),
             "parts": [
@@ -1054,7 +1165,7 @@ def run_transfer(
             "deliveries": deliveries,
         },
         "party_b": {
-            "maildir": _display(maildir_path, out),
+            "maildir": _display(maildir_path, work),
             "received_headers": {
                 "return_path": str(received["Return-Path"]),
                 "delivered_to": str(received["Delivered-To"]),
@@ -1065,17 +1176,17 @@ def run_transfer(
         "negative_controls": controls,
         "checks": checks.items,
     }
-    (out / "transfer-report.json").write_text(
+    (work / "transfer-report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    (out / "transfer-log.txt").write_text(log.text(), encoding="utf-8")
+    (work / "transfer-log.txt").write_text(log.text(), encoding="utf-8")
 
     # Belt and braces: the report and log were written after the scan above.
-    late_leaks = private_key_leaks(out, private_pem)
+    late_leaks = private_key_leaks(work, private_pem)
     all_passed = checks.all_passed and not late_leaks
     if late_leaks:
         print(f"FAIL: private key material found in {', '.join(late_leaks)}", file=sys.stderr)
-    return TransferResult(out=out, report=report, log_text=log.text(), all_passed=all_passed)
+    return TransferResult(out=work, report=report, log_text=log.text(), all_passed=all_passed)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1092,10 +1203,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     result = run_transfer(args.out, regenerate_key=args.regenerate_key)
+    if not result.all_passed:
+        print(
+            f"\nFAIL: {_display(args.out, ROOT)} was left unchanged. This run's files are in {result.out}",
+            file=sys.stderr,
+        )
+        return 1
     print(
         f"\nwrote {_display(result.out / 'transfer-report.json', ROOT)} and {_display(result.out / 'transfer-log.txt', ROOT)}"
     )
-    return 0 if result.all_passed else 1
+    return 0
 
 
 if __name__ == "__main__":

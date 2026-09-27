@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T13:45:21+00:00",
+  "generated_at": "2026-09-27T15:40:23+00:00",
   "command": "PYTHONPATH=backend python scripts/capture_screenshots.py",
   "viewport": {
     "width": 1440,
@@ -28,7 +28,7 @@
       "expected": "Authentic",
       "observed": "Authentic",
       "ok": true,
-      "detail": "SHA-256 before = after = 94ed9d492d9fa26e896e8ea54fedcefc64c24a52dd9cc10091127eacf750b7ac"
+      "detail": "SHA-256 before = after = ff05ed3194b7437ed7e8ddfefe6117631402bfd8eeb27395cdb634d584d5b48a"
     },
     {
       "scene": "party B: wrong passphrase",
