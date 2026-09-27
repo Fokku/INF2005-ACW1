@@ -26,7 +26,7 @@ The browser is **display-and-transport only**. It never reads or writes pixel or
 - Python **3.12 – 3.14** (`requires-python = ">=3.12,<3.15"`). NumPy 2.5 dropped 3.11. Dev box has 3.14.7; all compiled deps have cp314 wheels (verified 2026-09-08).
 - Create the environment with `python -m venv .venv`, then always `python -m pip …` (never bare `pip`). Debian/Ubuntu teammates need `python3-venv`.
 
-### Libraries (pin with `==` in `backend/pyproject.toml`; keep a `requirements.lock.txt` from `pip freeze`)
+### Libraries (pinned with `==` in `backend/pyproject.toml`)
 
 | Package | Version | Purpose |
 | --- | --- | --- |
@@ -42,12 +42,13 @@ The browser is **display-and-transport only**. It never reads or writes pixel or
 | `httpx` (dev) | 0.28.x | FastAPI `TestClient`. |
 | `ruff` (dev) | 0.16.x | Lint + format. |
 | `hypothesis` (dev, optional) | 6.x | Property test for the LSB round-trip only. |
+| `playwright` (`evidence` extra) | 1.63.0 | Drives the built GUI in headless Chromium for `scripts/capture_screenshots.py` (GUI evidence screenshots). Not needed to run or demo the app. |
 
 ### Package layout
 
 - `backend/stego_core/` — pure library, **no FastAPI/pydantic imports** (enforce with a tiny architecture test):
-  `lsb.py`, `image_codec.py`, `audio_codec.py`, `video_codec.py`, `hashing.py`, `kdf.py`, `signing.py`, `payload.py`, `container.py`, `location.py`, `verdict.py`, `pipeline.py`, `attacks.py`, `cli.py`
-- `backend/app/` — FastAPI: `main.py` (mounts `/api` routers, then serves `frontend/dist` with `StaticFiles(html=True)` when present), `schemas.py`, `storage.py` (writes outputs to `out/<uuid>.png|wav|avi`, serves `/api/files/{id}` with `Content-Disposition: attachment`; **never base64 in JSON**), `routers/{keys,capacity,protect,verify,attack,files}.py`
+  `lsb.py`, `image_codec.py`, `audio_codec.py`, `video_codec.py`, `hashing.py`, `kdf.py`, `signing.py`, `payload.py`, `container.py`, `location.py`, `extraction.py`, `ecc.py` (robust embedding), `sealing.py` (sealed frame), `steganalysis.py`, `verdict.py`, `pipeline.py`, `attacks.py`, `errors.py`, `cli.py`
+- `backend/app/` — FastAPI: `main.py` (mounts `/api` routers, then serves `frontend/dist` with `StaticFiles(html=True)` when present), `schemas.py`, `storage.py` (writes outputs to `out/<uuid>.png|wav|avi`, serves `/api/files/{id}` with `Content-Disposition: attachment`; **never base64 in JSON**), `routers/{keys,capacity,protect,verify,attack,files,samples,preview,steganalysis}.py`
 - `backend/tests/`
 - Console scripts: `stego` (`keygen | capacity | protect | verify | tamper | serve`) for scripted evidence, marker reproduction and a rescue path if the UI misbehaves live.
 
@@ -60,11 +61,11 @@ The browser is **display-and-transport only**. It never reads or writes pixel or
 
 | Package | Version | Purpose |
 | --- | --- | --- |
-| `react`, `react-dom` | 19.2.x | UI. Four tabs held in React state: **Protect**, **Verify**, **Keys**, **Attack Lab**. No router, no global state library, no axios. |
+| `react`, `react-dom` | 19.2.x | UI. Five tabs held in React state: **Protect**, **Verify**, **Keys**, **Attack Lab**, **Steganalysis**. Every page stays mounted and inactive ones are hidden, so switching tabs never loses a result. No router, no global state library, no axios. |
 | `vite` | 8.2.x | Dev server (with `/api` proxy → `127.0.0.1:8000`, so CORS never exists) and production build to `frontend/dist`. |
 | `@vitejs/plugin-react` | 6.1.x | React plugin. Its peer range is Vite ^8 — if Vite is ever downgraded to 7, downgrade this to 5.x too. |
 | `typescript` | 6.0.x | What the Vite template ships. TypeScript 7 (native port) is weeks old; do not jump to it. |
-| `tailwindcss` + `@tailwindcss/vite` | 4.3.x | Tailwind v4, CSS-first. `src/index.css` is just `@import "tailwindcss"; @plugin "daisyui";`. No `tailwind.config.js`, no PostCSS, **no Play CDN**. |
+| `tailwindcss` + `@tailwindcss/vite` | 4.3.x | Tailwind v4, CSS-first. `src/index.css` holds `@import "tailwindcss"; @plugin "daisyui";`, the bundled `@font-face` rules and the `casefile` daisyUI theme (`index.html` sets `data-theme="casefile"`). No `tailwind.config.js`, no PostCSS, **no Play CDN**. |
 | `daisyui` | 5.7.x | Component classes: `tabs`, `card`, `alert`, `badge`, `range` (LSB slider, `step=1`), `progress` (capacity), `file-input`, `steps` (A→B flow). |
 | `oxlint` (dev) | 1.x | Linting, shipped with the Vite template. No ESLint, no Prettier. |
 | `vitest` (dev, optional) | **4.1.x** | A handful of component tests. Not 5.0.0: its `engines` field excludes Node 25. |
@@ -75,15 +76,21 @@ The browser is **display-and-transport only**. It never reads or writes pixel or
 
 ```
 frontend/src/
-  main.tsx  App.tsx  index.css  types.ts        # types.ts hand-mirrors backend/app/schemas.py (frozen in week 1)
+  main.tsx  App.tsx  index.css  types.ts        # types.ts hand-mirrors backend/app/schemas.py and the router-local models
   api/client.ts                                  # fetch + FormData wrappers
-  pages/ ProtectPage  VerifyPage  KeysPage  AttackLabPage
-  components/ FilePicker  LsbSelector  StartLocationPanel  CapacityMeter  PayloadEditor
-              ImageCompare  AudioCompare  PayloadPreview  VerdictBadge  DownloadButton  ReportPanel  HashChip
+  pages/ ProtectPage  VerifyPage  KeysPage  AttackLabPage  SteganalysisPage
+  components/ FilePicker  LsbSelector  RedundancySelector  StartLocationPanel  CapacityMeter  StepSection  Field
+              ImageCompare  AudioCompare  VideoCompare  PayloadPreview  VerdictBadge  DownloadButton  ReportPanel
+              Exhibit  HandoffCard  EvidenceStrip  NotImplemented
   lib/hash.ts                                    # display-only SHA-256 of a File via WebCrypto ("hash before send / after download")
+  lib/useAviAudioTrack.ts                        # an AVI's PCM audio track as a playable WAV (POST /api/preview/audio-track)
+  lib/format.ts  lib/samplePayloads.ts
+  assets/fonts/                                  # bundled woff2 files; see its README.md
 ```
 
-Media handling: `ImageCompare` = two native `<img>` (cover from an object URL, stego from `/api/files/{id}`) plus a backend-rendered amplified LSB-plane diff PNG. `AudioCompare` = three native `<audio controls>` for cover, stego and payload. `PayloadPreview` switches on MIME (text → `<pre>`, image → `<img>`, audio → `<audio>`, else hex dump + download) — this is what satisfies the spec's "play (execute) payload".
+Media handling: `ImageCompare` = two native `<img>` (cover from an object URL, stego from `/api/files/{id}`) plus a backend-rendered amplified LSB-plane diff PNG. `AudioCompare` = three native `<audio controls>` for cover, stego and payload. `PayloadPreview` switches on MIME (text → `<pre>`, image → `<img>`, audio → `<audio>`, else hex dump + download) — this is what satisfies the spec's "play (execute) payload". `VideoCompare` plays each AVI's audio track, not the video: browsers cannot play AVI, and the payload lives in that PCM track. The backend re-wraps the track as a WAV for display only.
+
+Fonts are bundled, not fetched: latin-subset `woff2` files for Big Shoulders (stamped labels), Public Sans (body) and Martian Mono (exhibit data) live in `frontend/src/assets/fonts/` (SIL OFL 1.1; see that folder's `README.md`) and Vite copies them into `dist`. Nothing is loaded from Google Fonts or any CDN, so the lab PC needs no internet. See `docs/design/gui-design.md` §1.
 
 Tailwind v4 only emits classes it finds as literal tokens in source. Keep verdict styling in a `Record<Verdict, string>` of literal class strings; never build class names with template strings (or add an `@source inline(...)` safelist).
 
@@ -98,15 +105,17 @@ ACW1/
 │   └── demo-plan.md
 ├── keys/
 │   ├── public/               # tracked: team public key(s) *.pem
-│   └── private/              # gitignored: demo-only private key, regenerated by `stego keygen`
+│   └── private/              # gitignored: demo-only private keys (make_samples.py, `stego keygen --label <name>`)
 ├── samples/
 │   ├── image/{original,stego,tampered}/
 │   ├── audio/{original,stego,tampered}/
+│   ├── video/original/       # cover.avi, built by scripts/make_video_cover.py
 │   └── payloads/             # short (Learning Outcome), large (Project Overview), custom (encrypted)
-├── evidence/{screenshots,logs}/
+├── evidence/{screenshots,logs,transfer}/   # screenshots/gui/ from capture_screenshots.py; transfer/ from transfer_demo.py
 ├── out/                      # gitignored runtime outputs served at /api/files/{id}
-├── scripts/                  # setup.sh, setup.ps1, demo.sh, demo.ps1, check.sh, make_samples.py
-├── backend/                  # pyproject.toml, requirements.lock.txt, stego_core/, app/, tests/
+├── scripts/                  # setup.sh, setup.ps1, demo.sh, demo.ps1, check.sh, make_samples.py, make_video_cover.py,
+│                             # steganalysis.py, transfer_demo.py, capture_screenshots.py
+├── backend/                  # pyproject.toml, stego_core/, app/, tests/
 └── frontend/                 # package.json, pnpm-lock.yaml, vite.config.ts, src/
 ```
 
@@ -119,11 +128,18 @@ git clone <repo-url> ACW1 && cd ACW1
 python -m venv .venv
 source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r backend/requirements.lock.txt
-python -m pip install -e backend --no-deps      # registers the `stego` CLI
+python -m pip install -e "backend[dev]"         # pinned deps + the `stego` CLI (what scripts/setup.sh runs)
 cd frontend && pnpm install --frozen-lockfile && cd ..
-stego keygen --out keys                # writes keys/private/*.pem (ignored) and keys/public/*.pem (tracked)
+stego keygen --out keys --label <yourname>   # optional personal CLI key pair: keys/private/<yourname>_ed25519.pem
+                                             # (ignored) and keys/public/<yourname>_ed25519.pub.pem
 ```
+
+Never run `stego keygen` with the default label `team`. `keys/public/team_ed25519.pub.pem` is the
+committed key that every curated sample under `samples/` verifies against (the Verify tab's sample
+loader and the demo-plan fallbacks rely on it), so replacing it turns every Authentic sample into
+Signature Invalid. `keygen` refuses to overwrite an existing key file, either half, unless given
+`--force`. Commit a personal public key only if the team wants it in the Verify tab's key list. The
+GUI's Keys tab generates a pair without touching `keys/` at all.
 
 ### Dev loop (two terminals)
 
@@ -144,7 +160,16 @@ stego serve                            # http://127.0.0.1:8000 serves the built 
 ```bash
 cd backend && pytest -q | tee ../evidence/logs/pytest.txt && ruff check . && ruff format --check .
 cd frontend && pnpm lint && pnpm tsc -b
-python scripts/make_samples.py         # regenerates samples/ and evidence/logs deterministically
+python scripts/make_samples.py         # regenerates samples/ and evidence/logs; only with keys/private/team_ed25519.pem (README "Keys")
+PYTHONPATH=backend python scripts/make_video_cover.py                         # samples/video/original/cover.avi
+PYTHONPATH=backend python scripts/transfer_demo.py --out evidence/transfer    # local SMTP + Maildir party A -> B round trip (see evidence/transfer.md)
+```
+
+GUI evidence uses the optional `evidence` extra (Playwright) and the built UI (`cd frontend && pnpm build`):
+
+```bash
+python -m pip install -e "backend[evidence]" && python -m playwright install chromium   # once
+PYTHONPATH=backend python scripts/capture_screenshots.py   # evidence/screenshots/gui/ + manifest.json; asserts every scene's verdict, exits non-zero on a mismatch
 ```
 
 ## 6. Rules the stack depends on (do not "simplify" these later)
@@ -159,7 +184,7 @@ python scripts/make_samples.py         # regenerates samples/ and evidence/logs 
 8. **Email transport = file attachment only.** Inline paste, WhatsApp/Teams "photo" mode and "optimise images" re-encode and wipe the LSB plane. Show SHA-256 of the file before send and after download. Script a re-encoded copy as a deliberate *Payload Missing* negative case.
 9. **Never run the Vite dev server in the live demo.** Build once, serve from FastAPI. Rehearse on the actual lab PC, including browser version (Tailwind v4 needs Chrome/Edge/Firefox 128+ or Safari 16.4+).
 10. **Ship `frontend/dist` in the submission** (zip and/or a `submission` git tag) so the marker needs only Python.
-11. **Never commit private keys.** `keys/private/` is ignored; the marker verifies with `keys/public/*.pem`. Document that `stego keygen` creates a fresh demo pair and that regenerated samples verify against the new key.
+11. **Never commit private keys.** `keys/private/` is ignored; the marker verifies with `keys/public/*.pem`. Document that `stego keygen --label <name>` creates a fresh demo pair (it refuses to overwrite an existing key file without `--force`) and that regenerated samples verify against the new key.
 12. **Do not start the innovation module until every verdict is green in pytest for both image and audio.** 19 of 35 team marks are the two round-trips plus their negative cases.
 
 ## 7. Alternatives considered
@@ -170,6 +195,8 @@ python scripts/make_samples.py         # regenerates samples/ and evidence/logs 
 | Contract-first: committed `openapi.json` + `openapi-typescript` codegen + TanStack Query + Playwright + ESLint/Prettier + mypy strict + CI + Docker | Rejected | Best type safety, but none of it is marked and the tooling eats week 1 of a four-week project. With ~8 endpoints a hand-written `types.ts` gives the same safety. |
 | All-TypeScript (Node backend doing LSB with `pngjs` / hand-written WAV parser) | Rejected | Hand-rolled PNG/WAV codecs and browser-dependent WebCrypto Ed25519 support are where teams lose days. Pillow + `wave` + `cryptography` are proven. |
 | Desktop GUI (tkinter / PyQt) | Rejected | Team wants a web UI; tkinter does not even import on the dev box (missing `libtk8.6.so`). |
+
+Playwright was later added only as the optional `evidence` extra for the GUI screenshot script (`scripts/capture_screenshots.py`). Setup, the test suite and the demo do not need it.
 
 ## 8. Version pins and compatibility notes (checked 2026-09-08)
 

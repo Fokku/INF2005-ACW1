@@ -1,10 +1,10 @@
 import { ApiError } from '../api/client'
 
 /**
- * What the UI shows while a backend feature is still a stub.
+ * How a failed API call is shown: the backend's own error detail, plainly.
  *
- * Delete this component once every endpoint works. Until then it turns a 501
- * into a signpost: it names the exact function a teammate has to write.
+ * A 501 (a core function raising NotImplementedError) still gets a signpost
+ * naming the function, rather than an opaque error.
  */
 export function ErrorNotice({ error }: { error: unknown }) {
   if (error instanceof ApiError && error.isNotImplemented) {
@@ -19,20 +19,23 @@ export function ErrorNotice({ error }: { error: unknown }) {
           {error.body.todo && (
             <code className="font-exhibit mt-1 block text-xs break-all opacity-80">{error.body.todo}</code>
           )}
-          <p className="mt-1 text-xs opacity-70">See TODO.md for who is picking this up.</p>
         </div>
       </div>
     )
   }
 
   const message = error instanceof Error ? error.message : String(error)
+  // The capacity check is a required demo case, not a crash: say what it is.
+  const capacity = error instanceof ApiError && error.body.error === 'capacity_exceeded'
   return (
     <div className="alert alert-error items-start">
       <span className="font-stamp text-xl leading-none" aria-hidden>
         ✕
       </span>
       <div className="min-w-0">
-        <h3 className="font-medium">Something went wrong</h3>
+        <h3 className="font-medium">
+          {capacity ? 'Blocked before embedding: the payload does not fit' : 'Something went wrong'}
+        </h3>
         <p className="text-sm break-all">{message}</p>
       </div>
     </div>

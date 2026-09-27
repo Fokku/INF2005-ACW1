@@ -130,7 +130,14 @@ class CapacityReport(BaseModel):
     capacity_bits: int = Field(description="total_elements * n_lsb")
     capacity_bytes: int
     frame_overhead_bytes: int = Field(
-        description="header + signature + CRC, i.e. bytes not available for the message"
+        description="every byte of one copy's share of the cover the message cannot use: the frame "
+        "(header, signed payload fields, signature, CRC, seal nonce), this message's base64/encryption "
+        "inflation, and start_reserve_bytes"
+    )
+    start_reserve_bytes: int = Field(
+        default=0,
+        description="the part of frame_overhead_bytes lost before the start offset (explicit offset, or the "
+        "worst case for a derived start) and to element rounding; shown separately in the GUI",
     )
     max_message_bytes: int
     payload_bytes: int | None = Field(
@@ -206,6 +213,16 @@ class ProtectResult(BaseModel):
     changed_elements: int | None = None
     psnr_db: float | None = None
     redundancy: int = Field(default=1, description="copies of the frame that were embedded")
+    sealed: bool = Field(
+        default=False,
+        description="the frame was sealed (AES-256-CTR, 12-byte nonce); frame_bytes includes the nonce",
+    )
+    signer_public_key_pem: str = Field(
+        description="SPKI PEM public half of the private key that signed the payload, for party B"
+    )
+    signer_fingerprint: str = Field(
+        description="SHA-256 of the signer's DER SubjectPublicKeyInfo, hex (same as KeyInfo.fingerprint)"
+    )
 
 
 class VerifyReport(BaseModel):
@@ -222,6 +239,13 @@ class VerifyReport(BaseModel):
     hash_match: bool | None = None
     payload: PayloadInfo | None = None
     redundancy: int = Field(default=1, description="copies of the frame the verifier expected")
+    sealed: bool | None = Field(
+        default=None,
+        description=(
+            "True: a sealed frame was opened. False: a plaintext frame was found. None: no frame was "
+            "located (with a sealed file, a wrong passphrase or media ID also lands here)"
+        ),
+    )
 
 
 class AttackResult(BaseModel):

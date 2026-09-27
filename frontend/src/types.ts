@@ -80,7 +80,10 @@ export interface CapacityReport {
   total_elements: number
   capacity_bits: number
   capacity_bytes: number
+  /** Everything one copy loses besides the message, start_reserve_bytes included. */
   frame_overhead_bytes: number
+  /** The part of frame_overhead_bytes skipped before the start offset (worst case when derived). */
+  start_reserve_bytes: number
   max_message_bytes: number
   payload_bytes?: number | null
   fits?: boolean | null
@@ -121,6 +124,11 @@ export interface ProtectResult {
   psnr_db?: number | null
   /** Copies of the frame that were embedded. */
   redundancy: number
+  /** True when the frame was sealed (encrypted header; advanced start-location security). */
+  sealed: boolean
+  /** Public half of the signing key, so party A can hand it (and its fingerprint) to party B. */
+  signer_public_key_pem: string
+  signer_fingerprint: string
 }
 
 export interface VerifyReport {
@@ -138,6 +146,8 @@ export interface VerifyReport {
   payload?: PayloadInfo | null
   /** Copies of the frame the verifier expected. */
   redundancy: number
+  /** True: a sealed frame was opened. False: a plaintext frame. Null: no frame located. */
+  sealed?: boolean | null
 }
 
 export interface AttackResult {
@@ -180,4 +190,115 @@ export interface ApiErrorBody {
   detail?: string | null
   /** Present on 501s: names the backend function a teammate still has to write. */
   todo?: string | null
+}
+
+/** A curated file under samples/ with the exact settings that reproduce its verdict. */
+export interface SampleCase {
+  id: string
+  label: string
+  kind: CoverKind
+  file: string
+  url: string
+  expected_verdict: Verdict
+  media_id: string
+  n_lsb: number
+  start_mode: StartMode
+  explicit_start: number | null
+  passphrase: string | null
+  /** A file name under keys/public/. */
+  public_key: string
+  redundancy: number
+  note: string | null
+}
+
+/** A committed public key under keys/public/. */
+export interface PublicKeyFile {
+  name: string
+  fingerprint: string
+  public_key_pem: string
+  url: string
+}
+
+/** One window of the per-region steganalysis scan. */
+export interface SteganalysisWindow {
+  start: number
+  end: number
+  chi_square_p: number | null
+  phase_p: number | null
+  flagged: boolean
+}
+
+/** Chi-square (pairs of values) + byte-phase steganalysis of one file. */
+export interface SteganalysisReport {
+  filename: string
+  kind: CoverKind
+  elements: number
+  window: number
+  chi_square_p: number | null
+  phase_p: number | null
+  phase_n_lsb_guess: number | null
+  suspicious: boolean
+  verdict: string
+  summary: string
+  suspected_region: { start: number; end: number } | null
+  windows: SteganalysisWindow[]
+  /** Counts at full resolution; `windows` may merge neighbours for the chart. */
+  windows_total: number
+  windows_flagged: number
+  /** How many analysis windows each entry of `windows` covers (1 = none merged). */
+  windows_merged: number
+  method: string
+}
+
+/**
+ * Settings handed to the Verify tab from elsewhere in the app: the Protect
+ * tab's hand-off, an Attack Lab output, or a curated sample. `id` changes on
+ * every hand-off so the same settings can be re-applied.
+ */
+export interface VerifyPrefill {
+  id: number
+  source: string
+  file: File
+  mediaId: string
+  nLsb: number
+  redundancy: number
+  startMode: StartMode
+  explicitStart?: number | null
+  passphrase?: string | null
+  publicKeyPem?: string | null
+  publicKeyLabel?: string | null
+  expectedSha256?: string | null
+  expectedVerdict?: Verdict | null
+  note?: string | null
+  /**
+   * The file cannot be checked without the shared passphrase, even in explicit
+   * start mode: its frame is sealed, and a sealed frame is invisible without
+   * the key derived from it. Verify then blocks until a passphrase is typed,
+   * and keeps one already typed when the prefill carries none.
+   */
+  requiresPassphrase?: boolean
+}
+
+/** What the Protect tab produced last, shared with Verify and the Attack Lab. */
+export interface ProtectHandoff {
+  result: ProtectResult
+  mediaId: string
+  startMode: StartMode
+}
+
+/** A protected file handed to the Attack Lab, with the settings it was embedded with. */
+export interface AttackPrefill {
+  id: number
+  source: string
+  file: File
+  nLsb: number
+  startOffset: number
+  mediaId: string
+  redundancy: number
+  /** The target holds a sealed frame (the Attack Lab then uses key-less variants). */
+  sealed?: boolean
+  /** The hidden message was encrypted (Verify needs the passphrase to show it). */
+  messageEncrypted?: boolean
+  publicKeyPem?: string | null
+  publicKeyLabel?: string | null
 }

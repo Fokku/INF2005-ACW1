@@ -1,0 +1,555 @@
+{
+  "title": "ACW1 party A -> party B transfer (local email simulation)",
+  "scope": "LOCAL SIMULATION. Party A's smtplib client delivers an RFC 5322 email with base64 MIME attachments over SMTP to an in-process receiver on 127.0.0.1, which files it into party B's Maildir. No third-party mail provider is involved. The real two-machine email transfer is performed live during the demo (docs/demo-plan.md row 6).",
+  "command": "PYTHONPATH=backend .venv/bin/python scripts/transfer_demo.py --out evidence/transfer",
+  "generated_at": "2026-09-27T13:28:08+00:00",
+  "all_passed": true,
+  "summary": {
+    "checks_total": 45,
+    "checks_passed": 45
+  },
+  "settings": {
+    "n_lsb": 2,
+    "start_mode": "derived",
+    "encrypt_message": true,
+    "passphrase": "acw1-demo-passphrase-2026 (demo-only; shared out of band, never in the email)",
+    "wrong_passphrase_control": "not-the-shared-passphrase",
+    "message_file": "samples/payloads/custom.txt",
+    "message_bytes": 257,
+    "message_sha256": "db44e37a14cc566a405195b8235654f2240c16fa916e799850afc9bfbe740309"
+  },
+  "keys": {
+    "public_key": "keys/public/transfer-demo.pub.pem",
+    "fingerprint": "50f4a321588e3e25401a9a9ebd5636d1841196a8b549545e1e46007930a4830e",
+    "private_key_location": "keys/private/transfer-demo_ed25519.pem (gitignored; never copied into this folder)",
+    "generated_this_run": false
+  },
+  "party_a": {
+    "sent_at": "2026-09-27T13:28:08+00:00",
+    "files": [
+      {
+        "kind": "image",
+        "media_id": "P-transfer-image",
+        "filename": "transfer-image.stego.png",
+        "maintype": "image",
+        "subtype": "png",
+        "n_lsb": 2,
+        "start_mode": "derived",
+        "cover": "samples/image/original/cover.png",
+        "cover_size": 788092,
+        "cover_sha256": "9cb8ed079e6a9c3a79086eab28a769b05631dc4bdf1f8efbea828a47bbabbcbb",
+        "stego": "party-a/outbox/transfer-image.stego.png",
+        "size": 788084,
+        "sha256": "e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120",
+        "start_offset": 50002,
+        "frame_bytes": 917,
+        "capacity_bytes": 196608,
+        "payload_timestamp": "2026-09-27T13:28:08.114761+00:00",
+        "payload_nonce": "6a3c405d9b0573deb0add82f6eade267",
+        "message_encrypted": true,
+        "pre_send_verdict": "Authentic"
+      },
+      {
+        "kind": "audio",
+        "media_id": "P-transfer-audio",
+        "filename": "transfer-audio.stego.wav",
+        "maintype": "audio",
+        "subtype": "wav",
+        "n_lsb": 2,
+        "start_mode": "derived",
+        "cover": "samples/audio/original/cover.wav",
+        "cover_size": 441044,
+        "cover_sha256": "0eb06e56530f8c44653d3f25f917834c1d57ffbe4658f2d6ebe229e874d41055",
+        "stego": "party-a/outbox/transfer-audio.stego.wav",
+        "size": 441044,
+        "sha256": "22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39",
+        "start_offset": 19931,
+        "frame_bytes": 916,
+        "capacity_bytes": 55125,
+        "payload_timestamp": "2026-09-27T13:28:08.244742+00:00",
+        "payload_nonce": "685c327ed78c528ea8802aede531a804",
+        "message_encrypted": true,
+        "pre_send_verdict": "Authentic"
+      }
+    ]
+  },
+  "email": {
+    "from": "Party A <party-a@acw1.local>",
+    "to": "Party B <party-b@acw1.local>",
+    "subject": "ACW1 protected media for verification: P-transfer-image, P-transfer-audio",
+    "date": "Sun, 27 Sep 2026 13:28:08 +0000",
+    "message_id": "<179051568829.3026423.3449390986395334501.acw1-transfer@acw1.local>",
+    "raw_file": "party-a/sent.eml",
+    "raw_bytes": 1683903,
+    "raw_sha256": "fff1cb2c25a1781d7ab4989486974ef8ed717a01b57bed3ed9d2f7c70054522a",
+    "parts": [
+      {
+        "content_type": "multipart/mixed",
+        "filename": null,
+        "content_transfer_encoding": null
+      },
+      {
+        "content_type": "text/plain",
+        "filename": null,
+        "content_transfer_encoding": "7bit"
+      },
+      {
+        "content_type": "image/png",
+        "filename": "transfer-image.stego.png",
+        "content_transfer_encoding": "base64"
+      },
+      {
+        "content_type": "audio/wav",
+        "filename": "transfer-audio.stego.wav",
+        "content_transfer_encoding": "base64"
+      }
+    ]
+  },
+  "smtp": {
+    "host": "127.0.0.1",
+    "port": 43127,
+    "server_name": "mx.acw1.local",
+    "client_helo": "party-a.acw1.local",
+    "refused_recipients": {},
+    "transcript": [
+      "S: 220 mx.acw1.local ESMTP ACW1 local receiver (simulation)",
+      "C: ehlo party-a.acw1.local",
+      "S: 250-mx.acw1.local greets party-a.acw1.local",
+      "S: 250-SIZE 33554432",
+      "S: 250-8BITMIME",
+      "S: 250 HELP",
+      "C: mail from:<party-a@acw1.local> size=1683903",
+      "S: 250 2.1.0 Sender OK",
+      "C: rcpt to:<party-b@acw1.local>",
+      "S: 250 2.1.5 Recipient OK",
+      "C: data",
+      "S: 354 End data with <CR><LF>.<CR><LF>",
+      "C: [message data: 1,683,903 bytes in 21,622 lines; 0 dot-stuffed line(s) restored]",
+      "C: .",
+      "S: 250 2.0.0 OK: queued as FFF1CB2C25A1",
+      "C: QUIT",
+      "S: 221 2.0.0 mx.acw1.local closing connection"
+    ],
+    "deliveries": [
+      {
+        "queue_id": "FFF1CB2C25A1",
+        "maildir_key": "1790515688.M392686P3026423Q1.omarchy",
+        "path": "party-b/Maildir/new/1790515688.M392686P3026423Q1.omarchy",
+        "received_at": "2026-09-27T13:28:08+00:00",
+        "mail_from": "party-a@acw1.local",
+        "rcpt_to": [
+          "party-b@acw1.local"
+        ],
+        "smtp_data_bytes": 1683903,
+        "stored_bytes": 1662537
+      }
+    ]
+  },
+  "party_b": {
+    "maildir": "party-b/Maildir",
+    "received_headers": {
+      "return_path": "<party-a@acw1.local>",
+      "delivered_to": "party-b@acw1.local",
+      "received": "from party-a.acw1.local (localhost [127.0.0.1]) by mx.acw1.local (ACW1 local SMTP receiver) with ESMTP id FFF1CB2C25A1 for <party-b@acw1.local>; Sun, 27 Sep 2026 13:28:08 +0000"
+    },
+    "files": [
+      {
+        "filename": "transfer-image.stego.png",
+        "content_type": "image/png",
+        "content_transfer_encoding": "base64",
+        "saved_to": "party-b/downloads/transfer-image.stego.png",
+        "size": 788084,
+        "sha256": "e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120",
+        "expected_content_type": "image/png",
+        "sha256_party_a": "e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120",
+        "sha256_in_email": "e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120",
+        "sha256_match": true,
+        "bytes_identical": true,
+        "settings_from_email": {
+          "media_id": "P-transfer-image",
+          "n_lsb": 2,
+          "start_mode": "derived"
+        },
+        "verification": {
+          "verdict": "Authentic",
+          "reasons": [
+            "signature valid, media hash matches, parameters match the signed payload"
+          ],
+          "signature_valid": true,
+          "hash_match": true,
+          "media_hash_embedded": "d9b70cec968bde1ae59241bacdc9809372ace10d2bb3efbff488b8f814a880c0",
+          "media_hash_recomputed": "d9b70cec968bde1ae59241bacdc9809372ace10d2bb3efbff488b8f814a880c0",
+          "start_offset_used": 50002,
+          "message_decrypted": true,
+          "decryption_error": null,
+          "recovered_message_sha256": "db44e37a14cc566a405195b8235654f2240c16fa916e799850afc9bfbe740309",
+          "message_matches_original": true,
+          "start_offset_party_a": 50002
+        },
+        "extracted_message": "party-b/extracted/transfer-image.message.txt"
+      },
+      {
+        "filename": "transfer-audio.stego.wav",
+        "content_type": "audio/wav",
+        "content_transfer_encoding": "base64",
+        "saved_to": "party-b/downloads/transfer-audio.stego.wav",
+        "size": 441044,
+        "sha256": "22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39",
+        "expected_content_type": "audio/wav",
+        "sha256_party_a": "22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39",
+        "sha256_in_email": "22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39",
+        "sha256_match": true,
+        "bytes_identical": true,
+        "settings_from_email": {
+          "media_id": "P-transfer-audio",
+          "n_lsb": 2,
+          "start_mode": "derived"
+        },
+        "verification": {
+          "verdict": "Authentic",
+          "reasons": [
+            "signature valid, media hash matches, parameters match the signed payload"
+          ],
+          "signature_valid": true,
+          "hash_match": true,
+          "media_hash_embedded": "c6f5bbc3be4b66dc9ecda4109237778565c5882b1c7c17109b69da598312be6f",
+          "media_hash_recomputed": "c6f5bbc3be4b66dc9ecda4109237778565c5882b1c7c17109b69da598312be6f",
+          "start_offset_used": 19931,
+          "message_decrypted": true,
+          "decryption_error": null,
+          "recovered_message_sha256": "db44e37a14cc566a405195b8235654f2240c16fa916e799850afc9bfbe740309",
+          "message_matches_original": true,
+          "start_offset_party_a": 19931
+        },
+        "extracted_message": "party-b/extracted/transfer-audio.message.txt"
+      }
+    ]
+  },
+  "negative_controls": [
+    {
+      "control": "wrong_passphrase",
+      "kind": "image",
+      "file": "party-b/downloads/transfer-image.stego.png",
+      "passphrase_used": "not-the-shared-passphrase",
+      "expected": "not Authentic, message not decrypted",
+      "verdict": "Wrong Start Location",
+      "reasons": [
+        "payload magic was not found at the expected start location, but was found elsewhere in the cover — check the passphrase / explicit start offset"
+      ],
+      "signature_valid": null,
+      "hash_match": null,
+      "media_hash_embedded": null,
+      "media_hash_recomputed": null,
+      "start_offset_used": 64734,
+      "message_decrypted": false,
+      "decryption_error": null,
+      "recovered_message_sha256": null,
+      "message_matches_original": false
+    },
+    {
+      "control": "high_bit_flip_in_transit",
+      "kind": "image",
+      "file": "party-b/tampered/transfer-image.high-bit-flipped.png",
+      "change": {
+        "pixel_row": 256,
+        "pixel_col": 256,
+        "channel": "red",
+        "element_index": 393984,
+        "bit_flipped": 7,
+        "value_before": 190,
+        "value_after": 62
+      },
+      "sha256": "d81fc9f001545b981c166f0f0ad8e6b3812df24263ac69cc9c79b686b86e1bb3",
+      "sha256_matches_party_a": false,
+      "expected": "Tampered",
+      "verdict": "Tampered",
+      "reasons": [
+        "the recomputed media hash does not match the hash signed into the payload"
+      ],
+      "signature_valid": true,
+      "hash_match": false,
+      "media_hash_embedded": "d9b70cec968bde1ae59241bacdc9809372ace10d2bb3efbff488b8f814a880c0",
+      "media_hash_recomputed": "2ae4ce34efffcc85882294ba1d6a5ba199e1ebdecda01cbd93afc735a8ca0987",
+      "start_offset_used": 50002,
+      "message_decrypted": true,
+      "decryption_error": null,
+      "recovered_message_sha256": "db44e37a14cc566a405195b8235654f2240c16fa916e799850afc9bfbe740309",
+      "message_matches_original": true
+    },
+    {
+      "control": "wrong_passphrase",
+      "kind": "audio",
+      "file": "party-b/downloads/transfer-audio.stego.wav",
+      "passphrase_used": "not-the-shared-passphrase",
+      "expected": "not Authentic, message not decrypted",
+      "verdict": "Wrong Start Location",
+      "reasons": [
+        "payload magic was not found at the expected start location, but was found elsewhere in the cover — check the passphrase / explicit start offset"
+      ],
+      "signature_valid": null,
+      "hash_match": null,
+      "media_hash_embedded": null,
+      "media_hash_recomputed": null,
+      "start_offset_used": 3058,
+      "message_decrypted": false,
+      "decryption_error": null,
+      "recovered_message_sha256": null,
+      "message_matches_original": false
+    },
+    {
+      "control": "high_bit_flip_in_transit",
+      "kind": "audio",
+      "file": "party-b/tampered/transfer-audio.high-bit-flipped.wav",
+      "change": {
+        "sample_index": 110250,
+        "element_index": 110250,
+        "bit_flipped": 15,
+        "value_before": 117,
+        "value_after": 32885
+      },
+      "sha256": "adc363c2a4239ce7b51f09d10326ea8db0a5d2444cb4c594198f390dee76f539",
+      "sha256_matches_party_a": false,
+      "expected": "Tampered",
+      "verdict": "Tampered",
+      "reasons": [
+        "the recomputed media hash does not match the hash signed into the payload"
+      ],
+      "signature_valid": true,
+      "hash_match": false,
+      "media_hash_embedded": "c6f5bbc3be4b66dc9ecda4109237778565c5882b1c7c17109b69da598312be6f",
+      "media_hash_recomputed": "c12135a31c3786b68bb1cb10a51e216366a14af3b6358e448790c9d78dc86e22",
+      "start_offset_used": 19931,
+      "message_decrypted": true,
+      "decryption_error": null,
+      "recovered_message_sha256": "db44e37a14cc566a405195b8235654f2240c16fa916e799850afc9bfbe740309",
+      "message_matches_original": true
+    }
+  ],
+  "checks": [
+    {
+      "check": "the private and public transfer keys form a pair",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: party A's own pre-send check is Authentic",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: the signed payload marks the message as encrypted",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: party A's own pre-send check is Authentic",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: the signed payload marks the message as encrypted",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "both attachments are base64-encoded MIME parts",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "the passphrase is not in the email",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "the public key fingerprint is not in the email",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "SMTP accepted the message for party B",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "exactly one message was delivered",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "party B's Maildir holds one message",
+      "passed": true,
+      "detail": "1 found"
+    },
+    {
+      "check": "the received Message-ID matches the sent one",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "the email came from party A",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "both attachments arrived",
+      "passed": true,
+      "detail": "transfer-audio.stego.wav, transfer-image.stego.png"
+    },
+    {
+      "check": "image: content type is image/png",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: SHA-256 after download equals party A's SHA-256 before sending",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: SHA-256 equals the value stated in the email",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: downloaded bytes are identical to party A's file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: the email states the settings party A used",
+      "passed": true,
+      "detail": "{\"media_id\": \"P-transfer-image\", \"n_lsb\": 2, \"start_mode\": \"derived\"}"
+    },
+    {
+      "check": "image: verdict is Authentic",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: signature valid",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: recomputed media hash matches the signed hash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: frame found at party A's derived start offset",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: decrypted message equals the original",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: content type is audio/wav",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: SHA-256 after download equals party A's SHA-256 before sending",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: SHA-256 equals the value stated in the email",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: downloaded bytes are identical to party A's file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: the email states the settings party A used",
+      "passed": true,
+      "detail": "{\"media_id\": \"P-transfer-audio\", \"n_lsb\": 2, \"start_mode\": \"derived\"}"
+    },
+    {
+      "check": "audio: verdict is Authentic",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: signature valid",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: recomputed media hash matches the signed hash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: frame found at party A's derived start offset",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: decrypted message equals the original",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: wrong passphrase is not Authentic",
+      "passed": true,
+      "detail": "Wrong Start Location"
+    },
+    {
+      "check": "image: wrong passphrase does not decrypt the message",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: altered copy no longer matches party A's SHA-256",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "image: altered copy verifies as Tampered",
+      "passed": true,
+      "detail": "Tampered"
+    },
+    {
+      "check": "image: the signature still holds but the media hash differs",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: wrong passphrase is not Authentic",
+      "passed": true,
+      "detail": "Wrong Start Location"
+    },
+    {
+      "check": "audio: wrong passphrase does not decrypt the message",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: altered copy no longer matches party A's SHA-256",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "audio: altered copy verifies as Tampered",
+      "passed": true,
+      "detail": "Tampered"
+    },
+    {
+      "check": "audio: the signature still holds but the media hash differs",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "no private key material in the output folder",
+      "passed": true,
+      "detail": ""
+    }
+  ]
+}

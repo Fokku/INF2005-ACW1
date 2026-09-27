@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
@@ -36,10 +36,18 @@ def generate_keypair() -> tuple[bytes, bytes]:
     return private_pem, public_pem
 
 
+# `cryptography` raises UnsupportedAlgorithm, which is not a ValueError, for a
+# well-formed PEM whose algorithm OID or curve it does not know (for example an
+# EC key on brainpoolP160r1). It is still just a key we cannot use, so it becomes
+# KeyError_ like any other bad key: 400 from the API, Cannot Verify in a verdict,
+# skipped in the keys/public listing, never an unhandled 500.
+_UNUSABLE_KEY = (ValueError, TypeError, UnsupportedAlgorithm)
+
+
 def _load_private_key(private_pem: bytes) -> Ed25519PrivateKey:
     try:
         key = serialization.load_pem_private_key(private_pem, password=None)
-    except (ValueError, TypeError) as exc:
+    except _UNUSABLE_KEY as exc:
         raise KeyError_(f"malformed private key: {exc}") from exc
     if not isinstance(key, Ed25519PrivateKey):
         raise KeyError_("private key is not Ed25519")
@@ -49,7 +57,7 @@ def _load_private_key(private_pem: bytes) -> Ed25519PrivateKey:
 def _load_public_key(public_pem: bytes) -> Ed25519PublicKey:
     try:
         key = serialization.load_pem_public_key(public_pem)
-    except (ValueError, TypeError) as exc:
+    except _UNUSABLE_KEY as exc:
         raise KeyError_(f"malformed public key: {exc}") from exc
     if not isinstance(key, Ed25519PublicKey):
         raise KeyError_("public key is not Ed25519")

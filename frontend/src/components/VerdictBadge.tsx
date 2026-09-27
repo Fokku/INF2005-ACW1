@@ -66,7 +66,9 @@ export function VerdictBadge({ verdict, reasons }: { verdict: Verdict; reasons?:
         <span className={`font-stamp text-3xl leading-none ${style.text}`} aria-hidden>
           {style.glyph}
         </span>
-        <h3 className={`font-stamp text-3xl leading-none ${style.text}`}>{verdict}</h3>
+        <h3 data-testid="verdict" className={`font-stamp text-3xl leading-none ${style.text}`}>
+          {verdict}
+        </h3>
       </div>
       <p className="mt-2 text-sm text-base-content/70">{VERDICT_SENTENCE[verdict]}</p>
       {reasons && reasons.length > 0 && (

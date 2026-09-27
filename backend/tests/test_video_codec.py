@@ -161,9 +161,7 @@ def test_rejects_compressed_audio_track() -> None:
     wave_format = struct.pack("<HHIIHH", 85, 2, 44100, 16000, 1, 0)
     bitmap_info = struct.pack("<IiiHHIIiiII", 40, 64, 48, 1, 24, 0, 0, 0, 0, 0, 0)
     avih = struct.pack("<IIIIIIIIIIIIII", 40000, 0, 0, 0, 1, 0, 2, 0, 64, 48, 0, 0, 0, 0)
-    hdrl = _list(
-        b"hdrl", _chunk(b"avih", avih) + _strl(b"vids", bitmap_info) + _strl(b"auds", wave_format)
-    )
+    hdrl = _list(b"hdrl", _chunk(b"avih", avih) + _strl(b"vids", bitmap_info) + _strl(b"auds", wave_format))
     movi = _list(b"movi", _chunk(b"00dc", b"\x00" * 8) + _chunk(b"01wb", b"\x00" * 32))
     avi_bytes = _chunk(b"RIFF", b"AVI " + hdrl + movi)
 

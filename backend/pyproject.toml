@@ -19,6 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "httpx==0.28.1", "ruff==0.16.6"]
+# Browser automation for scripts/capture_screenshots.py (GUI evidence); then run
+# `python -m playwright install chromium` once.
+evidence = ["playwright==1.63.0"]
 
 [project.scripts]
 stego = "stego_core.cli:main"

@@ -3,10 +3,9 @@
 Complete — no TODO. It wires the routers, maps `stego_core` exceptions to clean
 HTTP responses, and serves the built frontend so the demo is a single process.
 
-While the core is unimplemented, every endpoint that needs it returns HTTP 501
-with `{"error": "not_implemented", "todo": "<function to write>"}`. The UI shows
-that message, so you can click through the whole interface today and watch it
-come alive as teammates fill the functions in.
+If a core function ever raises NotImplementedError, the endpoint answers HTTP 501
+with `{"error": "not_implemented", "todo": "<function>"}` and the UI names it,
+rather than failing with an opaque 500.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from stego_core.errors import StegoError
 
-from .routers import attack, capacity, files, keys, protect, verify
+from .routers import attack, capacity, files, keys, preview, protect, samples, steganalysis, verify
 from .schemas import HealthResponse
 
 log = logging.getLogger("acw1")
@@ -63,6 +62,9 @@ app.include_router(protect.router, prefix="/api", tags=["protect"])
 app.include_router(verify.router, prefix="/api", tags=["verify"])
 app.include_router(attack.router, prefix="/api", tags=["attack"])
 app.include_router(files.router, prefix="/api", tags=["files"])
+app.include_router(samples.router, prefix="/api", tags=["samples"])
+app.include_router(preview.router, prefix="/api", tags=["preview"])
+app.include_router(steganalysis.router, prefix="/api", tags=["steganalysis"])
 
 
 @app.get("/api/health", response_model=HealthResponse)

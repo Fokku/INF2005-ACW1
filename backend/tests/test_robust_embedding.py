@@ -95,8 +95,12 @@ def test_redundancy_one_baseline_does_not_survive_a_wiped_region(keys) -> None:
     assert _verify(protected.stego_bytes, keys, redundancy=1).verdict == Verdict.AUTHENTIC
 
     damaged = _wipe_body_copies(
-        protected.stego_bytes, n_lsb=4, start=0, frame_bytes=protected.frame_bytes,
-        redundancy=1, copy_indices=[0],
+        protected.stego_bytes,
+        n_lsb=4,
+        start=0,
+        frame_bytes=protected.frame_bytes,
+        redundancy=1,
+        copy_indices=[0],
     )
     result = _verify(damaged, keys, redundancy=1)
     assert result.verdict != Verdict.AUTHENTIC
@@ -111,8 +115,12 @@ def test_redundancy_three_survives_one_wiped_copy(keys) -> None:
     assert _verify(protected.stego_bytes, keys, redundancy=3).verdict == Verdict.AUTHENTIC
 
     damaged = _wipe_body_copies(
-        protected.stego_bytes, n_lsb=4, start=0, frame_bytes=protected.frame_bytes,
-        redundancy=3, copy_indices=[1],  # wipe the middle copy only
+        protected.stego_bytes,
+        n_lsb=4,
+        start=0,
+        frame_bytes=protected.frame_bytes,
+        redundancy=3,
+        copy_indices=[1],  # wipe the middle copy only
     )
     result = _verify(damaged, keys, redundancy=3)
     assert result.verdict == Verdict.AUTHENTIC, result.reasons
@@ -127,8 +135,12 @@ def test_redundancy_three_still_fails_once_two_copies_are_wiped(keys) -> None:
     protected = _protect(cover_bytes, keys, redundancy=3)
 
     damaged = _wipe_body_copies(
-        protected.stego_bytes, n_lsb=4, start=0, frame_bytes=protected.frame_bytes,
-        redundancy=3, copy_indices=[0, 1],
+        protected.stego_bytes,
+        n_lsb=4,
+        start=0,
+        frame_bytes=protected.frame_bytes,
+        redundancy=3,
+        copy_indices=[0, 1],
     )
     result = _verify(damaged, keys, redundancy=3)
     assert result.verdict != Verdict.AUTHENTIC

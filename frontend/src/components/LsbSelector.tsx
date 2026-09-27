@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 /**
  * Number of least-significant bits to use, 1 to 8.
  *
@@ -30,16 +32,17 @@ export function LsbSelector({
   disabled?: boolean
 }) {
   const quality = QUALITY[value]
+  const id = useId()
   return (
     <div className="w-full">
       <div className="flex items-center gap-4">
         <div className="flex-1">
-          <label htmlFor="lsb-range" className="text-sm font-medium text-base-content/80">
+          <label htmlFor={id} className="text-sm font-medium text-base-content/80">
             Least-significant bits
           </label>
 
           <input
-            id="lsb-range"
+            id={id}
             type="range"
             min={1}
             max={8}
@@ -47,6 +50,7 @@ export function LsbSelector({
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(Number(e.target.value))}
+            aria-valuetext={`${value} least-significant ${value === 1 ? 'bit' : 'bits'}`}
             className="range range-primary range-sm mt-2 w-full"
           />
 

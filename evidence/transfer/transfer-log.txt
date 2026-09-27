@@ -1,0 +1,171 @@
+ACW1 party A -> party B transfer (LOCAL SIMULATION)
+In-process SMTP on 127.0.0.1 + Maildir, standard library only; not a third-party mail provider.
+generated_at: 2026-09-27T13:28:08+00:00
+command:      PYTHONPATH=backend .venv/bin/python scripts/transfer_demo.py --out evidence/transfer
+
+== Keys ==
+public key:   keys/public/transfer-demo.pub.pem
+fingerprint:  50f4a321588e3e25401a9a9ebd5636d1841196a8b549545e1e46007930a4830e
+private key:  keys/private/transfer-demo_ed25519.pem (read locally; never copied into the output)
+  [PASS] the private and public transfer keys form a pair
+
+== Party A: protect ==
+message: samples/payloads/custom.txt (257 bytes, SHA-256 db44e37a14cc566a405195b8235654f2240c16fa916e799850afc9bfbe740309)
+settings: n_lsb=2, start mode=derived, message encrypted with AES-256-GCM
+[image] samples/image/original/cover.png (788,092 bytes)
+        -> party-a/outbox/transfer-image.stego.png (788,084 bytes)
+        media ID P-transfer-image, derived start offset 50002, frame 917 bytes of 196,608 capacity
+        SHA-256 before sending: e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120
+  [PASS] image: party A's own pre-send check is Authentic
+  [PASS] image: the signed payload marks the message as encrypted
+[audio] samples/audio/original/cover.wav (441,044 bytes)
+        -> party-a/outbox/transfer-audio.stego.wav (441,044 bytes)
+        media ID P-transfer-audio, derived start offset 19931, frame 916 bytes of 55,125 capacity
+        SHA-256 before sending: 22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39
+  [PASS] audio: party A's own pre-send check is Authentic
+  [PASS] audio: the signed payload marks the message as encrypted
+
+== Party A: compose the email ==
+From:        Party A <party-a@acw1.local>
+To:          Party B <party-b@acw1.local>
+Subject:     ACW1 protected media for verification: P-transfer-image, P-transfer-audio
+Date:        Sun, 27 Sep 2026 13:28:08 +0000
+Message-ID:  <179051568829.3026423.3449390986395334501.acw1-transfer@acw1.local>
+  part: multipart/mixed        -                            -
+  part: text/plain             -                            7bit
+  part: image/png              transfer-image.stego.png     base64
+  part: audio/wav              transfer-audio.stego.wav     base64
+raw message: party-a/sent.eml (1,683,903 bytes, SHA-256 fff1cb2c25a1781d7ab4989486974ef8ed717a01b57bed3ed9d2f7c70054522a)
+body as party B will read it:
+  | Hi Party B,
+  | 
+  | Attached are two files protected with the ACW1 stego tool. Please save both
+  | attachments to your downloads folder, check each file's SHA-256 against the
+  | value below, and then verify each one in the Verify tab.
+  | 
+  | File:        transfer-image.stego.png
+  | Cover kind:  image
+  | Media ID:    P-transfer-image
+  | LSB count:   2
+  | Start mode:  derived (from the shared passphrase)
+  | Size:        788084 bytes
+  | SHA-256:     e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120
+  | 
+  | File:        transfer-audio.stego.wav
+  | Cover kind:  audio
+  | Media ID:    P-transfer-audio
+  | LSB count:   2
+  | Start mode:  derived (from the shared passphrase)
+  | Size:        441044 bytes
+  | SHA-256:     22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39
+  | 
+  | The passphrase and my public key's fingerprint are not in this email. I have
+  | shared both with you separately (out of band). Please confirm that the public
+  | key you verify with has the fingerprint I gave you before trusting a verdict.
+  | 
+  | Party A
+  [PASS] both attachments are base64-encoded MIME parts
+  [PASS] the passphrase is not in the email
+  [PASS] the public key fingerprint is not in the email
+
+== SMTP session with mx.acw1.local on 127.0.0.1:43127 (receiver's record) ==
+S: 220 mx.acw1.local ESMTP ACW1 local receiver (simulation)
+C: ehlo party-a.acw1.local
+S: 250-mx.acw1.local greets party-a.acw1.local
+S: 250-SIZE 33554432
+S: 250-8BITMIME
+S: 250 HELP
+C: mail from:<party-a@acw1.local> size=1683903
+S: 250 2.1.0 Sender OK
+C: rcpt to:<party-b@acw1.local>
+S: 250 2.1.5 Recipient OK
+C: data
+S: 354 End data with <CR><LF>.<CR><LF>
+C: [message data: 1,683,903 bytes in 21,622 lines; 0 dot-stuffed line(s) restored]
+C: .
+S: 250 2.0.0 OK: queued as FFF1CB2C25A1
+C: QUIT
+S: 221 2.0.0 mx.acw1.local closing connection
+smtplib.sendmail refused recipients: none
+  [PASS] SMTP accepted the message for party B
+  [PASS] exactly one message was delivered
+
+== Party B: open the mailbox and download the attachments ==
+  [PASS] party B's Maildir holds one message (1 found)
+stored at: party-b/Maildir/new/1790515688.M392686P3026423Q1.omarchy (1,662,537 bytes)
+From: Party A <party-a@acw1.local>  To: Party B <party-b@acw1.local>
+Subject: ACW1 protected media for verification: P-transfer-image, P-transfer-audio
+Received: from party-a.acw1.local (localhost [127.0.0.1]) by mx.acw1.local (ACW1 local SMTP receiver) with ESMTP id FFF1CB2C25A1 for <party-b@acw1.local>; Sun, 27 Sep 2026 13:28:08 +0000
+  [PASS] the received Message-ID matches the sent one
+  [PASS] the email came from party A
+  [PASS] both attachments arrived (transfer-audio.stego.wav, transfer-image.stego.png)
+
+== Party B: SHA-256 comparison and verification ==
+public key: keys/public/transfer-demo.pub.pem (fingerprint 50f4a321588e3e25401a9a9ebd5636d1841196a8b549545e1e46007930a4830e, confirmed out of band)
+passphrase: shared out of band
+[image] transfer-image.stego.png
+        content type image/png, transfer encoding base64
+        saved to party-b/downloads/transfer-image.stego.png (788,084 bytes)
+        SHA-256 party A (before): e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120
+        SHA-256 in the email:     e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120
+        SHA-256 party B (after):  e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120
+  [PASS] image: content type is image/png
+  [PASS] image: SHA-256 after download equals party A's SHA-256 before sending
+  [PASS] image: SHA-256 equals the value stated in the email
+  [PASS] image: downloaded bytes are identical to party A's file
+  [PASS] image: the email states the settings party A used ({"media_id": "P-transfer-image", "n_lsb": 2, "start_mode": "derived"})
+        verify: Authentic; signature valid True; media hash match True; start offset 50002
+        media hash signed:     d9b70cec968bde1ae59241bacdc9809372ace10d2bb3efbff488b8f814a880c0
+        media hash recomputed: d9b70cec968bde1ae59241bacdc9809372ace10d2bb3efbff488b8f814a880c0
+        recovered message -> party-b/extracted/transfer-image.message.txt: CONFIDENTIAL — ACW1 demo release note: this custom payload is a synthetic, team-authored message used only to demonstrate AES-256-GCM confidentiality layered on top of the signed integrity payload. It contains no real personal or confidential information.
+  [PASS] image: verdict is Authentic
+  [PASS] image: signature valid
+  [PASS] image: recomputed media hash matches the signed hash
+  [PASS] image: frame found at party A's derived start offset
+  [PASS] image: decrypted message equals the original
+[audio] transfer-audio.stego.wav
+        content type audio/wav, transfer encoding base64
+        saved to party-b/downloads/transfer-audio.stego.wav (441,044 bytes)
+        SHA-256 party A (before): 22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39
+        SHA-256 in the email:     22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39
+        SHA-256 party B (after):  22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39
+  [PASS] audio: content type is audio/wav
+  [PASS] audio: SHA-256 after download equals party A's SHA-256 before sending
+  [PASS] audio: SHA-256 equals the value stated in the email
+  [PASS] audio: downloaded bytes are identical to party A's file
+  [PASS] audio: the email states the settings party A used ({"media_id": "P-transfer-audio", "n_lsb": 2, "start_mode": "derived"})
+        verify: Authentic; signature valid True; media hash match True; start offset 19931
+        media hash signed:     c6f5bbc3be4b66dc9ecda4109237778565c5882b1c7c17109b69da598312be6f
+        media hash recomputed: c6f5bbc3be4b66dc9ecda4109237778565c5882b1c7c17109b69da598312be6f
+        recovered message -> party-b/extracted/transfer-audio.message.txt: CONFIDENTIAL — ACW1 demo release note: this custom payload is a synthetic, team-authored message used only to demonstrate AES-256-GCM confidentiality layered on top of the signed integrity payload. It contains no real personal or confidential information.
+  [PASS] audio: verdict is Authentic
+  [PASS] audio: signature valid
+  [PASS] audio: recomputed media hash matches the signed hash
+  [PASS] audio: frame found at party A's derived start offset
+  [PASS] audio: decrypted message equals the original
+
+== Negative controls ==
+[image] wrong passphrase on party-b/downloads/transfer-image.stego.png: Wrong Start Location
+        payload magic was not found at the expected start location, but was found elsewhere in the cover — check the passphrase / explicit start offset
+  [PASS] image: wrong passphrase is not Authentic (Wrong Start Location)
+  [PASS] image: wrong passphrase does not decrypt the message
+[image] one high bit flipped ({"pixel_row": 256, "pixel_col": 256, "channel": "red", "element_index": 393984, "bit_flipped": 7, "value_before": 190, "value_after": 62}) -> party-b/tampered/transfer-image.high-bit-flipped.png
+        SHA-256 d81fc9f001545b981c166f0f0ad8e6b3812df24263ac69cc9c79b686b86e1bb3 (party A sent e680fbbd331c525cddbb297300a3bdd743057fb264a509a65f99fe1e30823120)
+        verify: Tampered; signature valid True; media hash match False
+  [PASS] image: altered copy no longer matches party A's SHA-256
+  [PASS] image: altered copy verifies as Tampered (Tampered)
+  [PASS] image: the signature still holds but the media hash differs
+[audio] wrong passphrase on party-b/downloads/transfer-audio.stego.wav: Wrong Start Location
+        payload magic was not found at the expected start location, but was found elsewhere in the cover — check the passphrase / explicit start offset
+  [PASS] audio: wrong passphrase is not Authentic (Wrong Start Location)
+  [PASS] audio: wrong passphrase does not decrypt the message
+[audio] one high bit flipped ({"sample_index": 110250, "element_index": 110250, "bit_flipped": 15, "value_before": 117, "value_after": 32885}) -> party-b/tampered/transfer-audio.high-bit-flipped.wav
+        SHA-256 adc363c2a4239ce7b51f09d10326ea8db0a5d2444cb4c594198f390dee76f539 (party A sent 22d95718609d81ce62f523b9cb8c0bf54258238f659af6b877e25b477a9fee39)
+        verify: Tampered; signature valid True; media hash match False
+  [PASS] audio: altered copy no longer matches party A's SHA-256
+  [PASS] audio: altered copy verifies as Tampered (Tampered)
+  [PASS] audio: the signature still holds but the media hash differs
+
+== Result ==
+  [PASS] no private key material in the output folder
+PASS: 45/45 checks passed

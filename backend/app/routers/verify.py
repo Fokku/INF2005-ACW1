@@ -1,7 +1,8 @@
 """Verify: extract, check the signature and the hash, and return a verdict.
 
 Covers steps 7-10 of the required security workflow (spec Section 7) and
-FR8, FR9, FR10.
+FR8, FR9, FR10. Sealed frames need no extra input: pipeline.verify opens one
+automatically when the passphrase is right, and the report says so in `sealed`.
 """
 
 from __future__ import annotations
@@ -157,4 +158,5 @@ async def verify(
         hash_match=hash_match,
         payload=payload_info,
         redundancy=redundancy,
+        sealed=outcome.sealed,
     )

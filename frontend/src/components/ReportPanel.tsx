@@ -8,8 +8,6 @@ import { Exhibit } from './Exhibit'
  * Rubric criterion 4 wants a "clear linkage between verification logic and
  * outcomes", so this table shows each check separately rather than folding
  * everything into one pass/fail.
- *
- * Complete — no TODO.
  */
 function Check({ label, state, detail }: { label: string; state: boolean | null | undefined; detail?: string }) {
   const icon = state === true ? '✓' : state === false ? '✗' : '—'
@@ -40,6 +38,13 @@ export function ReportPanel({ report }: { report: VerifyReport }) {
             : undefined
         }
       />
+      {report.sealed !== null && report.sealed !== undefined && (
+        <Check
+          label="Frame sealed (encrypted header)"
+          state={report.sealed ? true : null}
+          detail={report.sealed ? 'opened with the passphrase-derived seal key' : 'plaintext header — not sealed'}
+        />
+      )}
       <Check label="Digital signature valid" state={report.signature_valid} />
       <Check
         label="Media hash matches the signed value"
