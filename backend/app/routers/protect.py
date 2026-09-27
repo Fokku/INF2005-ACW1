@@ -11,7 +11,7 @@ import json
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from stego_core import image_codec, pipeline
+from stego_core import ecc, image_codec, pipeline
 
 from .. import storage
 from ..schemas import CoverKind, FileRef, PayloadInfo, ProtectResult, StartMode
@@ -36,12 +36,17 @@ async def protect(
     passphrase: str | None = Form(None, description="shared secret for the derived start / encryption"),
     encrypt_message: bool = Form(False),
     private_key_pem: UploadFile | None = File(None),
+    redundancy: int = Form(1, description="copies of the frame to embed: 1 (off), 3, 5, 7 or 9"),
 ) -> ProtectResult:
     """Embed and sign, then return the stego file plus everything the demo needs
     to explain what happened.
     """
     if start_mode == StartMode.explicit and explicit_start is None:
         raise HTTPException(status_code=400, detail="explicit start mode requires an explicit_start offset")
+    try:
+        ecc.validate_redundancy(redundancy)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     cover_bytes = await cover.read()
     kind = _sniff_kind(cover.filename or "")
@@ -74,6 +79,7 @@ async def protect(
         passphrase=passphrase or None,
         explicit_start=explicit_start if start_mode == StartMode.explicit else None,
         encrypt_message=encrypt_message,
+        redundancy=redundancy,
     )
     outcome = pipeline.protect(opts)
 
@@ -118,4 +124,5 @@ async def protect(
         frame_bytes=outcome.frame_bytes,
         capacity_bytes=outcome.capacity_bytes,
         diff=diff_ref,
+        redundancy=outcome.redundancy,
     )

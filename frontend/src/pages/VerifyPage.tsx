@@ -5,6 +5,7 @@ import { FilePicker } from '../components/FilePicker'
 import { LsbSelector } from '../components/LsbSelector'
 import { ErrorNotice } from '../components/NotImplemented'
 import { PayloadPreview } from '../components/PayloadPreview'
+import { RedundancySelector } from '../components/RedundancySelector'
 import { ReportPanel } from '../components/ReportPanel'
 import { StartLocationPanel } from '../components/StartLocationPanel'
 import { StepSection } from '../components/StepSection'
@@ -28,6 +29,7 @@ export function VerifyPage() {
   const [startMode, setStartMode] = useState<StartMode>('derived')
   const [passphrase, setPassphrase] = useState('')
   const [explicitStart, setExplicitStart] = useState(1024)
+  const [redundancy, setRedundancy] = useState(1)
 
   const [report, setReport] = useState<VerifyReport | null>(null)
   const [error, setError] = useState<unknown>(null)
@@ -53,6 +55,7 @@ export function VerifyPage() {
           startMode,
           explicitStart: startMode === 'explicit' ? explicitStart : undefined,
           passphrase: passphrase || undefined,
+          redundancy,
         }),
       )
     } catch (err) {
@@ -111,8 +114,10 @@ export function VerifyPage() {
 
         <StepSection num="3" title="Extraction settings">
           <LsbSelector value={nLsb} onChange={setNLsb} />
+          <RedundancySelector value={redundancy} onChange={setRedundancy} />
           <p className="text-xs text-base-content/60">
-            This must match what party A used. Pick the wrong number and the frame will not parse.
+            Both the LSB count and the number of copies must match what party A used. Pick a wrong
+            number and the frame will not parse.
           </p>
           <StartLocationPanel
             showEncryptionPassphrase

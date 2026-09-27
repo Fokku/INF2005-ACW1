@@ -26,7 +26,8 @@ export function CapacityMeter({
     )
   }
 
-  const used = messageBytes + report.frame_overhead_bytes
+  // Robust embedding writes the whole frame `redundancy` times.
+  const used = (messageBytes + report.frame_overhead_bytes) * report.redundancy
   const percent = Math.min(100, (used / Math.max(1, report.capacity_bytes)) * 100)
   const fits = used <= report.capacity_bytes
 
@@ -50,14 +51,16 @@ export function CapacityMeter({
         <dd className="font-exhibit text-right">{report.n_lsb}</dd>
         <dt>Frame overhead</dt>
         <dd className="font-exhibit text-right">{formatBytes(report.frame_overhead_bytes)}</dd>
+        <dt>Copies embedded</dt>
+        <dd className="font-exhibit text-right">{report.redundancy}</dd>
         <dt>Largest message</dt>
         <dd className="font-exhibit text-right">{formatBytes(report.max_message_bytes)}</dd>
       </dl>
 
       {!fits && (
         <div className="alert alert-error text-sm">
-          Payload is larger than this cover can hold. Use a bigger cover, raise the LSB count, or
-          shorten the message.
+          Payload is larger than this cover can hold. Use a bigger cover, raise the LSB count,
+          embed fewer copies, or shorten the message.
         </div>
       )}
     </div>

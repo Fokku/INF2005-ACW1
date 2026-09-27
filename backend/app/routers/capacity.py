@@ -5,9 +5,9 @@ its own panel in the UI.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from stego_core import audio_codec, container, hashing, image_codec, lsb, signing, video_codec
+from stego_core import audio_codec, container, ecc, hashing, image_codec, lsb, signing, video_codec
 from stego_core.errors import UnsupportedCoverError
 
 from ..schemas import AudioInfo, CapacityReport, CoverInfo, CoverKind, ImageInfo, VideoInfo
@@ -84,8 +84,13 @@ async def check_capacity(
     cover: UploadFile = File(..., description="PNG, WAV, or AVI cover object"),
     n_lsb: int = Form(1, ge=1, le=8),
     payload_bytes: int | None = Form(None, description="size of the message the user wants to hide"),
+    redundancy: int = Form(1, description="copies of the frame that will be embedded"),
 ) -> CapacityReport:
     """Report how much this cover can hold, and whether the message fits."""
+    try:
+        ecc.validate_redundancy(redundancy)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     data = await cover.read()
     kind = _sniff_kind(cover.filename or "")
     decoded = _decode_cover(kind, data)
@@ -100,7 +105,9 @@ async def check_capacity(
     # "Largest message" is a standalone figure independent of what's currently
     # typed: invert the base64 ratio (raw = 3/4 of its encoded size) rather
     # than treating the message as going in byte-for-byte.
-    max_message_bytes = max(0, ((capacity_bytes - fixed_frame_bytes) * 3) // 4)
+    # With robust embedding the whole frame is written `redundancy` times, so
+    # each copy only gets 1/redundancy of the cover.
+    max_message_bytes = max(0, ((capacity_bytes // redundancy - fixed_frame_bytes) * 3) // 4)
 
     frame_overhead_bytes = fixed_frame_bytes
     fits = None
@@ -110,7 +117,7 @@ async def check_capacity(
         # actual base64 inflation into it so that comparison is accurate,
         # instead of the generic (and here, wrong-by-33%) flat constant.
         frame_overhead_bytes = fixed_frame_bytes + (_base64_len(payload_bytes) - payload_bytes)
-        fits = (fixed_frame_bytes + _base64_len(payload_bytes)) <= capacity_bytes
+        fits = (fixed_frame_bytes + _base64_len(payload_bytes)) * redundancy <= capacity_bytes
 
     return CapacityReport(
         cover=cover_info,
@@ -122,4 +129,5 @@ async def check_capacity(
         max_message_bytes=max_message_bytes,
         payload_bytes=payload_bytes,
         fits=fits,
+        redundancy=redundancy,
     )

@@ -20,6 +20,7 @@ EXPECTED = {
     "reencode": Verdict.PAYLOAD_MISSING,
     "corrupt_payload": Verdict.TAMPERED,
     "replay": Verdict.TAMPERED,
+    "lsb_noise": Verdict.TAMPERED,
 }
 
 DESCRIPTIONS = {
@@ -29,7 +30,13 @@ DESCRIPTIONS = {
     "reencode": "JPEG round-trip for images; downsample and interpolate PCM for audio/video. Expect Payload Missing after a complete unsuccessful search, or Cannot Verify if the search limit is reached. Surviving data can produce other verdicts.",
     "corrupt_payload": "Change one payload bit while preserving the header and stored CRC. Expect Tampered at the original explicit offset.",
     "replay": "Copy a valid frame into a different cover. Expect Tampered; verify using the original media ID, key, LSB count and explicit offset.",
+    "lsb_noise": "Flip 0.1% of the hidden low bits at random, like mild transmission noise; the visible content is unchanged. Expect Tampered for a file protected with 1 copy. A file protected with 3 or 5 copies should still verify Authentic, because the other copies outvote the damaged bits.",
 }
+
+# Fraction of hidden low bits flipped by lsb_noise. Measured on the sample
+# covers: at 0.1%, 1 copy almost never survives, while 3 and 5 copies almost
+# always do, which is the contrast the robust-embedding demo needs.
+LSB_NOISE_RATE = 0.001
 
 
 def _load(data: bytes, kind: str):
@@ -88,6 +95,30 @@ def lsb_scrub(data: bytes, kind: str, n_lsb: int) -> bytes:
     cover = _load(data, kind)
     mask = np.array(np.iinfo(cover.elements.dtype).max ^ ((1 << n_lsb) - 1), dtype=cover.elements.dtype)
     return _save(cover, cover.elements & mask, kind)
+
+
+def lsb_noise(data: bytes, kind: str, n_lsb: int = 1, rate: float = LSB_NOISE_RATE, seed: int = 0) -> bytes:
+    """Flip each of the low `n_lsb` bits of every element independently with
+    probability `rate`.
+
+    Only the low bits change, so the stable media hash (which masks those
+    bits) still matches. Any failure therefore comes from damage to the
+    hidden frame itself, which is exactly what robust embedding repairs. The
+    fixed seed makes the same file always get the same damage, so a demo can
+    be repeated.
+    """
+    if not 1 <= n_lsb <= 8:
+        raise ValueError("n_lsb must be between 1 and 8")
+    if not 0 < rate < 1:
+        raise ValueError("rate must be between 0 and 1, exclusive")
+    cover = _load(data, kind)
+    elements = cover.elements.copy()
+    rng = np.random.default_rng(seed)
+    flips = np.zeros(elements.shape, dtype=elements.dtype)
+    for bit in range(n_lsb):
+        hit = rng.random(elements.shape) < rate
+        flips |= hit.astype(elements.dtype) << bit
+    return _save(cover, elements ^ flips, kind)
 
 
 def reencode(data: bytes, kind: str) -> bytes:

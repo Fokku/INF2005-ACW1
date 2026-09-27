@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import container, hashing, location, lsb, signing
+from . import container, ecc, hashing, location, lsb, signing
 from . import payload as payload_mod
 from .errors import CapacityError, FrameError
 
@@ -22,31 +22,74 @@ class ExtractedFrame:
     encrypted: bool
 
 
-def extract_frame(elements: np.ndarray, start: int, n_lsb: int) -> ExtractedFrame:
+def extract_frame(elements: np.ndarray, start: int, n_lsb: int, redundancy: int = 1) -> ExtractedFrame:
     """Read a fixed-size header, then a frame bounded by the remaining cover.
 
     Never allocate from unchecked length fields. A partial header or a frame
     extending past the cover raises FrameError. Invalid caller settings raise
     ValueError through the shared location validator.
+
+    `redundancy` is the bonus robust-embedding factor (see `ecc.py`). At the
+    default of 1 this function is byte-for-byte identical to before the
+    parameter existed. Above 1, `pipeline.protect` embedded the header and
+    the rest of the frame as two separate runs of `redundancy` back-to-back
+    copies each (header block, then body block) rather than one run of
+    whole-frame copies. That split is what lets this function keep reading
+    the header first without yet knowing the payload/signature lengths, exactly
+    like the redundancy=1 path below, just with each block majority-voted
+    back to one copy before it is hashed into `container.parse_header` /
+    `parse_frame`.
     """
+    if redundancy == 1:
+        try:
+            location.validate_start(len(elements), start, container.HEADER_SIZE * 8, n_lsb)
+        except CapacityError as exc:
+            raise FrameError("frame header extends past the end of the cover") from exc
+        header = lsb.bits_to_bytes(lsb.extract_bits(elements, start, container.HEADER_SIZE * 8, n_lsb))
+        payload_len, sig_len, frame_n_lsb, _ = container.parse_header(header)
+        if frame_n_lsb != n_lsb:
+            raise FrameError("frame LSB count does not match the selected extraction LSB count")
+        if sig_len != signing.SIGNATURE_BYTES:
+            raise FrameError(f"frame signature must contain {signing.SIGNATURE_BYTES} bytes, got {sig_len}")
+
+        frame_bits = container.frame_size_bits(payload_len, sig_len)
+        try:
+            location.validate_start(len(elements), start, frame_bits, n_lsb)
+        except CapacityError as exc:
+            raise FrameError("frame extends past the end of the cover") from exc
+        raw = lsb.bits_to_bytes(lsb.extract_bits(elements, start, frame_bits, n_lsb))
+        payload_bytes, signature, frame_n_lsb, encrypted = container.parse_frame(raw)
+        return ExtractedFrame(payload_bytes, signature, frame_n_lsb, encrypted)
+
+    ecc.validate_redundancy(redundancy)
+    header_bits_needed = container.HEADER_SIZE * 8 * redundancy
     try:
-        location.validate_start(len(elements), start, container.HEADER_SIZE * 8, n_lsb)
+        location.validate_start(len(elements), start, header_bits_needed, n_lsb)
     except CapacityError as exc:
         raise FrameError("frame header extends past the end of the cover") from exc
-    header = lsb.bits_to_bytes(lsb.extract_bits(elements, start, container.HEADER_SIZE * 8, n_lsb))
+    header = lsb.bits_to_bytes(
+        ecc.majority_vote(lsb.extract_bits(elements, start, header_bits_needed, n_lsb), redundancy)
+    )
     payload_len, sig_len, frame_n_lsb, _ = container.parse_header(header)
     if frame_n_lsb != n_lsb:
         raise FrameError("frame LSB count does not match the selected extraction LSB count")
     if sig_len != signing.SIGNATURE_BYTES:
         raise FrameError(f"frame signature must contain {signing.SIGNATURE_BYTES} bytes, got {sig_len}")
 
-    frame_bits = container.frame_size_bits(payload_len, sig_len)
+    # The body block starts immediately after the header block's own
+    # (possibly zero-padded) element span, using the same ceil() accounting
+    # `embed_bits` used when it wrote the two blocks back to back.
+    header_elements = -(-header_bits_needed // n_lsb)
+    body_start = start + header_elements
+    body_bits_needed = (payload_len + sig_len + container.CRC_SIZE) * 8 * redundancy
     try:
-        location.validate_start(len(elements), start, frame_bits, n_lsb)
+        location.validate_start(len(elements), body_start, body_bits_needed, n_lsb)
     except CapacityError as exc:
         raise FrameError("frame extends past the end of the cover") from exc
-    raw = lsb.bits_to_bytes(lsb.extract_bits(elements, start, frame_bits, n_lsb))
-    payload_bytes, signature, frame_n_lsb, encrypted = container.parse_frame(raw)
+    body = lsb.bits_to_bytes(
+        ecc.majority_vote(lsb.extract_bits(elements, body_start, body_bits_needed, n_lsb), redundancy)
+    )
+    payload_bytes, signature, frame_n_lsb, encrypted = container.parse_frame(header + body)
     return ExtractedFrame(payload_bytes, signature, frame_n_lsb, encrypted)
 
 
