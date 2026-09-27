@@ -9,6 +9,9 @@ Two views are reported:
   * whole-file p-value (is there a payload at all?)
   * per-window p-values (WHERE is it? this reveals the start location and length)
 
+The analysis itself lives in backend/stego_core/steganalysis.py, shared with the web API
+(POST /api/steganalysis); this script adds the command line and the evidence `demo`.
+
 Usage (repo root, venv active):
     PYTHONPATH=backend python scripts/steganalysis.py analyze FILE [--window 4096]
     PYTHONPATH=backend python scripts/steganalysis.py demo --out evidence/steganalysis \
@@ -19,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 
@@ -27,117 +29,27 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from stego_core import audio_codec, image_codec, pipeline, signing, video_codec  # noqa: E402
-
-MIN_PAIR_TOTAL = 8  # pairs with fewer samples are dropped (chi-square validity)
-
-
-def chi_square_p(elements: np.ndarray) -> tuple[float, int]:
-    """Return (p-value of 'pairs are equalised', degrees of freedom)."""
-    values = elements.astype(np.int64)
-    pair_ids, inverse = np.unique(values >> 1, return_inverse=True)
-    totals = np.bincount(inverse)
-    ones = np.bincount(inverse, weights=(values & 1))
-    keep = totals >= MIN_PAIR_TOTAL
-    if keep.sum() < 3:
-        return float("nan"), 0
-    expected = totals[keep] / 2.0
-    chi2 = float(np.sum((ones[keep] - expected) ** 2 / expected))
-    df = int(keep.sum()) - 1
-    # Wilson-Hilferty approximation of the chi-square survival function.
-    z = ((chi2 / df) ** (1 / 3) - (1 - 2 / (9 * df))) / math.sqrt(2 / (9 * df))
-    return 0.5 * math.erfc(z / math.sqrt(2)), df
-
-
-def _chi2_sf(chi2: float, df: int) -> float:
-    z = ((chi2 / df) ** (1 / 3) - (1 - 2 / (9 * df))) / math.sqrt(2 / (9 * df))
-    return 0.5 * math.erfc(z / math.sqrt(2))
-
-
-def phase_test(elements: np.ndarray) -> tuple[float, int]:
-    """Byte-phase test. Our frame is byte-oriented ASCII/base64 JSON, so an embedded bit-plane
-    repeats with period 8/n_lsb elements and some phases are biased (e.g. the always-zero ASCII
-    top bit). Homogeneity chi-square of the ones-fraction across phases: covers give a uniform
-    p, embedded regions give p near 0. Returns (smallest p over planes, guess of n_lsb)."""
-    best_p, best_n = 1.0, 0
-    for n in (1, 2, 4):
-        period = 8 // n
-        usable = len(elements) // period * period
-        grid = elements[:usable].reshape(-1, period).astype(np.int64)
-        for plane in range(n):
-            ones = ((grid >> plane) & 1).sum(axis=0).astype(float)
-            rows = grid.shape[0]
-            frac = ones.sum() / (rows * period)
-            if frac < 0.02 or frac > 0.98:  # constant plane (silence/saturation): nothing to test
-                continue
-            p_hat = frac
-            chi2 = float(np.sum((ones - rows * p_hat) ** 2 / (rows * p_hat * (1 - p_hat))))
-            p = _chi2_sf(chi2, period - 1) if chi2 > 0 else 1.0
-            if p < best_p:
-                best_p, best_n = p, n
-    return best_p, best_n
+from stego_core import pipeline, signing  # noqa: E402
+from stego_core.steganalysis import (  # noqa: E402,F401  (re-exported for anyone importing this script)
+    KIND_BY_SUFFIX,
+    MIN_PAIR_TOTAL,
+    PHASE_ALPHA,
+    _chi2_sf,
+    analyze_elements,
+    chi_square_p,
+    decode_elements,
+    natural_cover,
+    phase_test,
+    summary_line,
+)
 
 
 def load_elements(path: Path) -> np.ndarray:
     data = path.read_bytes()
     suffix = path.suffix.lower()
-    if suffix == ".png":
-        return image_codec.load_png(data).elements
-    if suffix == ".wav":
-        return audio_codec.load_wav(data).elements
-    if suffix == ".avi":  # video cover = its PCM audio track
-        return video_codec.load_avi(data).elements
-    raise SystemExit(f"unsupported file type: {suffix} (need .png, .wav or .avi)")
-
-
-def analyze_elements(elements: np.ndarray, window: int) -> dict:
-    whole_p, whole_df = chi_square_p(elements)
-    windows = []
-    for begin in range(0, len(elements) - window + 1, window):
-        p, _ = chi_square_p(elements[begin : begin + window])
-        pp, guess = phase_test(elements[begin : begin + window])
-        windows.append({"begin": begin, "end": begin + window, "p": p, "phase_p": pp, "n_lsb_guess": guess})
-    flagged = [w for w in windows if w["phase_p"] < 1e-6]
-    region = None
-    if flagged:
-        region = {"first_flagged_window_begin": flagged[0]["begin"], "last_flagged_window_end": flagged[-1]["end"]}
-    return {
-        "elements": int(len(elements)),
-        "whole_file_p": whole_p,
-        "whole_file_df": whole_df,
-        "window": window,
-        "windows_total": len(windows),
-        "windows_flagged": len(flagged),
-        "suspected_region": region,
-        "windows": windows,
-    }
-
-
-def summary_line(name: str, result: dict) -> str:
-    region = result["suspected_region"]
-    where = f"elements {region['first_flagged_window_begin']}-{region['last_flagged_window_end']}" if region else "none"
-    return (
-        f"{name:<44} whole-file p={result['whole_file_p']:.4f}  "
-        f"flagged windows={result['windows_flagged']}/{result['windows_total']}  suspected region: {where}"
-    )
-
-
-def natural_cover(size: int = 512, seed: int = 7) -> bytes:
-    """A smooth, photo-like synthetic PNG (unequal value pairs, unlike white noise)."""
-    import io
-
-    from PIL import Image
-
-    rng = np.random.default_rng(seed)
-    y, x = np.mgrid[0:size, 0:size]
-    base = 110 + 60 * np.sin(x / 47.0) + 45 * np.cos(y / 61.0) + 25 * np.sin((x + y) / 19.0)
-    # Sensor-like noise, then a contrast stretch. The stretch leaves every other grey level
-    # under-populated, i.e. strongly unequal (2k, 2k+1) pairs, as tone-mapped photos have.
-    channels = [np.clip((base + off + rng.normal(0, 0.6, base.shape) - 128) * 1.7 + 128, 0, 255) for off in (0, 12, -10)]
-    img = Image.fromarray(np.rint(np.stack(channels, axis=-1)).astype(np.uint8), "RGB")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue()
+    if suffix not in KIND_BY_SUFFIX:
+        raise SystemExit(f"unsupported file type: {suffix} (need .png, .wav or .avi)")
+    return decode_elements(data, KIND_BY_SUFFIX[suffix])
 
 
 def _embed(kind: str, cover: bytes, message: bytes, private: bytes, n_lsb: int, start: int, encrypt: bool):

@@ -7,14 +7,30 @@ the demo, and mention that these keys exist only for the assignment.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from pathlib import Path
+
+from fastapi import APIRouter, Form, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from stego_core import signing
+from stego_core.errors import KeyError_
 
 from .. import storage
 from ..schemas import KeyInfo, KeyPairResult
 
 router = APIRouter()
+
+PUBLIC_KEYS_DIR = Path(__file__).resolve().parents[3] / "keys" / "public"
+
+
+class PublicKeyFile(BaseModel):
+    """A committed public key under keys/public/ (never a private key)."""
+
+    name: str
+    fingerprint: str
+    public_key_pem: str
+    url: str
 
 
 @router.post("/keys/generate", response_model=KeyPairResult)
@@ -35,8 +51,43 @@ async def generate(label: str = "team") -> KeyPairResult:
 
 
 @router.post("/keys/inspect", response_model=KeyInfo)
-async def inspect(public_key_pem: str) -> KeyInfo:
+async def inspect(
+    public_key_pem: str = Form(..., description="PEM text of an Ed25519 public key"),
+) -> KeyInfo:
     """Show the fingerprint of a public key, so both parties can confirm they
     hold the same one before trusting a verdict."""
-    fp = signing.fingerprint(public_key_pem.encode())
+    try:
+        fp = signing.fingerprint(public_key_pem.encode())
+    except (KeyError_, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"not a usable public key: {exc}") from exc
     return KeyInfo(key_id=fp[:16], label="imported", public_key_pem=public_key_pem, fingerprint=fp)
+
+
+@router.get("/keys/public", response_model=list[PublicKeyFile])
+async def public_keys() -> list[PublicKeyFile]:
+    """The team's committed public keys, so the Verify tab can pick one without
+    a file dialog. Only `keys/public/*.pem` is read; `keys/private/` never is."""
+    keys = []
+    for path in sorted(PUBLIC_KEYS_DIR.glob("*.pem")):
+        pem = path.read_bytes()
+        try:
+            fp = signing.fingerprint(pem)
+        except (KeyError_, ValueError):
+            continue
+        keys.append(
+            PublicKeyFile(
+                name=path.name,
+                fingerprint=fp,
+                public_key_pem=pem.decode(),
+                url=f"/api/keys/public/{path.name}",
+            )
+        )
+    return keys
+
+
+@router.get("/keys/public/{name}")
+async def public_key_file(name: str) -> FileResponse:
+    path = (PUBLIC_KEYS_DIR / Path(name).name).resolve()
+    if path.parent != PUBLIC_KEYS_DIR.resolve() or path.suffix != ".pem" or not path.is_file():
+        raise HTTPException(status_code=404, detail="public key not found")
+    return FileResponse(path, media_type="application/x-pem-file", filename=path.name)
