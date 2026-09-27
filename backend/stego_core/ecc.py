@@ -48,9 +48,7 @@ def majority_vote(bits: np.ndarray, redundancy: int) -> np.ndarray:
     if redundancy == 1:
         return bits
     if len(bits) % redundancy != 0:
-        raise FrameError(
-            f"redundant bit run length {len(bits)} is not a multiple of redundancy {redundancy}"
-        )
+        raise FrameError(f"redundant bit run length {len(bits)} is not a multiple of redundancy {redundancy}")
     copies = bits.reshape(redundancy, len(bits) // redundancy)
     votes = copies.sum(axis=0, dtype=np.uint16)
     return (votes * 2 > redundancy).astype(np.uint8)

@@ -53,7 +53,9 @@ def load_wav(data: bytes) -> AudioCover:
         raise UnsupportedCoverError("could not decode audio data as PCM WAV") from exc
 
     if sampwidth not in (1, 2):
-        raise UnsupportedCoverError(f"unsupported WAV sample width: {sampwidth * 8}-bit (need 8 or 16-bit PCM)")
+        raise UnsupportedCoverError(
+            f"unsupported WAV sample width: {sampwidth * 8}-bit (need 8 or 16-bit PCM)"
+        )
 
     dtype = np.uint8 if sampwidth == 1 else np.int16
     arr = np.frombuffer(raw, dtype=dtype)

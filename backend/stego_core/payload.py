@@ -36,13 +36,13 @@ GCM_NONCE_BYTES = 12
 class Payload:
     """The structure that is serialized, signed and embedded in the cover."""
 
-    media_id: str  
-    timestamp: str  
+    media_id: str
+    timestamp: str
     media_hash: str  # produced by hashing.stable_media_hash(...)
     nonce: str  # 16 random bytes as hex, ensures no two payloads look identical
     cover_kind: str  # "image" or "audio"
     n_lsb: int  # 1..8, signed so it cannot be changed after the fact
-    shape: list[int]  # [h, w, c] for image, [frames, channels] for audio 
+    shape: list[int]  # [h, w, c] for image, [frames, channels] for audio
     message_mime: str  # "text/plain", "image/png", "audio/wav", ...
     message: bytes  # the hidden message itself, plaintext or AES-GCM ciphertext
     encrypted: bool = False
@@ -106,7 +106,7 @@ def deserialize(raw: bytes) -> Payload:
         raise FrameError(f"malformed payload: {exc}") from exc
 
 
-# The functions below implement the custom encrypted payload for confidentiality, in addition to integrity. 
+# The functions below implement the custom encrypted payload for confidentiality, in addition to integrity.
 # Signing already provides integrity; AES-GCM provides confidentiality and its own
 # integrity check, so this effectively layers encryption on top of signing.
 

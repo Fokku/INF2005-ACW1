@@ -91,15 +91,15 @@ def embed_bits(elements: np.ndarray, bits: np.ndarray, start: int, n_lsb: int) -
         bits = np.concatenate([bits, np.zeros(pad, dtype=np.uint8)])
     groups = bits.reshape(n_needed, n_lsb)
 
-    weights = (1 << np.arange(n_lsb - 1, -1, -1, dtype=np.uint32))
+    weights = 1 << np.arange(n_lsb - 1, -1, -1, dtype=np.uint32)
     packed = groups.astype(np.uint32) @ weights  # MSB of each group first
 
     bit_width = elements.dtype.itemsize * 8
     clear_mask = np.array(~((1 << n_lsb) - 1) & ((1 << bit_width) - 1), dtype=elements.dtype)
 
     out = elements.copy()
-    out[start:start + n_needed] &= clear_mask
-    out[start:start + n_needed] |= packed.astype(elements.dtype)
+    out[start : start + n_needed] &= clear_mask
+    out[start : start + n_needed] |= packed.astype(elements.dtype)
     return out
 
 
@@ -122,7 +122,7 @@ def extract_bits(elements: np.ndarray, start: int, n_bits: int, n_lsb: int) -> n
             f"but only {len(elements) - start} are available"
         )
 
-    vals = (elements[start:start + n_elements] & np.array((1 << n_lsb) - 1, dtype=elements.dtype))
+    vals = elements[start : start + n_elements] & np.array((1 << n_lsb) - 1, dtype=elements.dtype)
     weights = np.arange(n_lsb - 1, -1, -1)  # MSB of each group first, matches embed_bits
     unfolded = ((vals[:, None].astype(np.uint32) >> weights) & 1).astype(np.uint8)
     return unfolded.reshape(-1)[:n_bits]
