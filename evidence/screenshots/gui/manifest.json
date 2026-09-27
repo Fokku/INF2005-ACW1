@@ -1,0 +1,314 @@
+{
+  "generated_at": "2026-09-27T13:45:21+00:00",
+  "command": "PYTHONPATH=backend python scripts/capture_screenshots.py",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "results": [
+    {
+      "scene": "keys: generate + fingerprint check",
+      "screenshot": "01-keys-generate.jpg",
+      "expected": "key pair",
+      "observed": "key pair",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "party A: protect image (custom, AES)",
+      "screenshot": "02-party-a-protect-image.jpg",
+      "expected": "Hand-off to party B",
+      "observed": "Hand-off to party B",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "party B: verify downloaded image",
+      "screenshot": "03-party-b-verify-image.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": "SHA-256 before = after = 94ed9d492d9fa26e896e8ea54fedcefc64c24a52dd9cc10091127eacf750b7ac"
+    },
+    {
+      "scene": "party B: wrong passphrase",
+      "screenshot": "04-party-b-wrong-passphrase.jpg",
+      "expected": "Wrong Start Location",
+      "observed": "Wrong Start Location",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "sample: image-short-authentic",
+      "screenshot": "10-verdict-01-image-short-authentic.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": "samples/image/stego/image-short.stego.png"
+    },
+    {
+      "scene": "sample: image-large-authentic",
+      "screenshot": "10-verdict-02-image-large-authentic.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": "samples/image/stego/image-large.stego.png"
+    },
+    {
+      "scene": "sample: image-custom-authentic",
+      "screenshot": "10-verdict-03-image-custom-authentic.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": "samples/image/stego/image-custom.stego.png"
+    },
+    {
+      "scene": "sample: image-tampered",
+      "screenshot": "10-verdict-04-image-tampered.jpg",
+      "expected": "Tampered",
+      "observed": "Tampered",
+      "ok": true,
+      "detail": "samples/image/tampered/image-flip_bits.png"
+    },
+    {
+      "scene": "sample: image-signature-invalid",
+      "screenshot": "10-verdict-05-image-signature-invalid.jpg",
+      "expected": "Signature Invalid",
+      "observed": "Signature Invalid",
+      "ok": true,
+      "detail": "samples/image/stego/image-short.stego.png"
+    },
+    {
+      "scene": "sample: image-payload-missing",
+      "screenshot": "10-verdict-06-image-payload-missing.jpg",
+      "expected": "Payload Missing",
+      "observed": "Payload Missing",
+      "ok": true,
+      "detail": "samples/image/original/cover-empty.png"
+    },
+    {
+      "scene": "sample: image-wrong-start-location",
+      "screenshot": "10-verdict-07-image-wrong-start-location.jpg",
+      "expected": "Wrong Start Location",
+      "observed": "Wrong Start Location",
+      "ok": true,
+      "detail": "samples/image/stego/image-derived-start.stego.png"
+    },
+    {
+      "scene": "sample: audio-short-authentic",
+      "screenshot": "10-verdict-08-audio-short-authentic.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": "samples/audio/stego/audio-short.stego.wav"
+    },
+    {
+      "scene": "sample: audio-large-authentic",
+      "screenshot": "10-verdict-09-audio-large-authentic.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": "samples/audio/stego/audio-large.stego.wav"
+    },
+    {
+      "scene": "sample: audio-custom-authentic",
+      "screenshot": "10-verdict-10-audio-custom-authentic.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": "samples/audio/stego/audio-custom.stego.wav"
+    },
+    {
+      "scene": "sample: audio-tampered",
+      "screenshot": "10-verdict-11-audio-tampered.jpg",
+      "expected": "Tampered",
+      "observed": "Tampered",
+      "ok": true,
+      "detail": "samples/audio/tampered/audio-flip_bits.wav"
+    },
+    {
+      "scene": "sample: audio-signature-invalid",
+      "screenshot": "10-verdict-12-audio-signature-invalid.jpg",
+      "expected": "Signature Invalid",
+      "observed": "Signature Invalid",
+      "ok": true,
+      "detail": "samples/audio/stego/audio-short.stego.wav"
+    },
+    {
+      "scene": "sample: audio-payload-missing",
+      "screenshot": "10-verdict-13-audio-payload-missing.jpg",
+      "expected": "Payload Missing",
+      "observed": "Payload Missing",
+      "ok": true,
+      "detail": "samples/audio/original/cover-empty.wav"
+    },
+    {
+      "scene": "sample: audio-wrong-start-location",
+      "screenshot": "10-verdict-14-audio-wrong-start-location.jpg",
+      "expected": "Wrong Start Location",
+      "observed": "Wrong Start Location",
+      "ok": true,
+      "detail": "samples/audio/stego/audio-derived-start.stego.wav"
+    },
+    {
+      "scene": "sample: image-cannot-verify",
+      "screenshot": "10-verdict-15-image-cannot-verify.jpg",
+      "expected": "Cannot Verify",
+      "observed": "Cannot Verify",
+      "ok": true,
+      "detail": "samples/image/original/cover.png"
+    },
+    {
+      "scene": "capacity: image too small",
+      "screenshot": "20-capacity-image.jpg",
+      "expected": "blocked",
+      "observed": "blocked",
+      "ok": true,
+      "detail": "payload does not fit: the frame needs 28074 bytes (224592 bits) at n_lsb=1, but this cover only has capacity for 384 bytes"
+    },
+    {
+      "scene": "capacity: audio too small",
+      "screenshot": "20-capacity-audio.jpg",
+      "expected": "blocked",
+      "observed": "blocked",
+      "ok": true,
+      "detail": "payload does not fit: the frame needs 28073 bytes (224584 bits) at n_lsb=1, but this cover only has capacity for 500 bytes"
+    },
+    {
+      "scene": "protect audio (explicit 5000)",
+      "screenshot": "30-protect-audio.jpg",
+      "expected": "Hand-off to party B",
+      "observed": "Hand-off to party B",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "verify audio via hand-off",
+      "screenshot": "31-verify-audio-handoff.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "protect AVI video",
+      "screenshot": "40-protect-video.jpg",
+      "expected": "Hand-off to party B",
+      "observed": "Hand-off to party B",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "verify AVI video",
+      "screenshot": "41-verify-video.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "attack flip_bits -> verify",
+      "screenshot": "51-attack-flip_bits-verify.jpg",
+      "expected": "Tampered",
+      "observed": "Tampered",
+      "ok": true,
+      "detail": "predicted Tampered"
+    },
+    {
+      "scene": "attack corrupt_payload -> verify",
+      "screenshot": "52-attack-corrupt_payload-verify.jpg",
+      "expected": "Tampered",
+      "observed": "Tampered",
+      "ok": true,
+      "detail": "predicted Tampered"
+    },
+    {
+      "scene": "robust: 1 copy/copies + lsb_noise",
+      "screenshot": "60-robust-1-copies.jpg",
+      "expected": "Tampered",
+      "observed": "Tampered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "robust: 3 copy/copies + lsb_noise",
+      "screenshot": "60-robust-3-copies.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "protect sealed frame",
+      "screenshot": "70-protect-sealed.jpg",
+      "expected": "Hand-off to party B",
+      "observed": "Hand-off to party B",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "sealed: right passphrase",
+      "screenshot": "71-sealed-right-passphrase.jpg",
+      "expected": "Authentic",
+      "observed": "Authentic",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "sealed: wrong passphrase",
+      "screenshot": "72-sealed-wrong-passphrase.jpg",
+      "expected": "Cannot Verify",
+      "observed": "Cannot Verify",
+      "ok": true,
+      "detail": "a sealed frame is invisible without the passphrase"
+    },
+    {
+      "scene": "steganalysis: sealed stego",
+      "screenshot": "73-steganalysis-sealed.jpg",
+      "expected": "no evidence",
+      "observed": "no evidence",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "steganalysis: image-large.stego.png",
+      "screenshot": "80-steganalysis-image-stego.jpg",
+      "expected": "signs",
+      "observed": "signs",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "steganalysis: cover.png",
+      "screenshot": "81-steganalysis-image-clean.jpg",
+      "expected": "no evidence",
+      "observed": "no evidence",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "steganalysis: audio-large.stego.wav",
+      "screenshot": "82-steganalysis-audio-stego.jpg",
+      "expected": "signs",
+      "observed": "signs",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "steganalysis: image-derived-start.stego.png",
+      "screenshot": "83-steganalysis-derived-start.jpg",
+      "expected": "signs",
+      "observed": "signs",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scene": "protect image at 8 LSBs",
+      "screenshot": "90-protect-image-8-lsb.jpg",
+      "expected": "Hand-off to party B",
+      "observed": "Hand-off to party B",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
